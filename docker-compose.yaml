@@ -1,0 +1,148 @@
+services:
+  # # Database Services
+  # mongodb:
+  #   image: mongo:7.0
+  #   container_name: uit-go-mongodb
+  #   restart: unless-stopped
+  #   ports:
+  #     - "27017:27017"
+  #   environment:
+  #     MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+  #     MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-password123}
+  #     MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-uitgo}
+  #   volumes:
+  #     - mongodb_data:/data/db
+  #   networks:
+  #     - uit-go-network
+
+  # # Caching Service
+  # redis:
+  #   image: redis:7.2-alpine
+  #   container_name: uit-go-redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123}
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - uit-go-network
+
+  # # Message Broker Services
+  # zookeeper:
+  #   image: confluentinc/cp-zookeeper:7.4.0
+  #   container_name: uit-go-zookeeper
+  #   restart: unless-stopped
+  #   environment:
+  #     ZOOKEEPER_CLIENT_PORT: 2181
+  #     ZOOKEEPER_TICK_TIME: 2000
+  #   volumes:
+  #     - zookeeper_data:/var/lib/zookeeper/data
+  #   networks:
+  #     - uit-go-network
+
+  # kafka:
+  #   image: confluentinc/cp-kafka:7.4.0
+  #   container_name: uit-go-kafka
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - zookeeper
+  #   ports:
+  #     - "9092:9092"
+  #     - "9094:9094"
+  #   environment:
+  #     KAFKA_BROKER_ID: 1
+  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  #     KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+  #     KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+  #     KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+  #   volumes:
+  #     - kafka_data:/var/lib/kafka/data
+  #   networks:
+  #     - uit-go-network
+
+  # Application Services
+  user-service:
+    build: ./services/user-service
+    container_name: uit-go-user-service
+    restart: unless-stopped
+    # ports:
+    #   - "3001:3000"
+    volumes:
+      - ./services/user-service:/app
+      - /app/node_modules
+    env_file:
+      - ./env/user-service.env
+    # depends_on:
+    #   - mongodb
+    #   - redis
+    #   - kafka
+    networks:
+      - uit-go-network
+
+  driver-service:
+    build: ./services/driver-service
+    container_name: uit-go-driver-service
+    restart: unless-stopped
+    # ports:
+    #   - "3002:3000"
+    volumes:
+      - ./services/driver-service:/app
+      - /app/node_modules
+    env_file:
+      - ./env/driver-service.env
+    # depends_on:
+    #   - mongodb
+    #   - redis
+    #   - kafka
+    networks:
+      - uit-go-network
+
+  trip-service:
+    build: ./services/trip-service
+    container_name: uit-go-trip-service
+    restart: unless-stopped
+    # ports:
+    #   - "3003:3000"
+    volumes:
+      - ./services/trip-service:/app
+      - /app/node_modules
+    env_file:
+      - ./env/trip-service.env
+    # depends_on:
+    #   - mongodb
+    #   - redis
+    #   - kafka
+    networks:
+      - uit-go-network
+
+  gateway:
+    build: ./gateway
+    container_name: uit-go-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:3000"
+    volumes:
+      - ./gateway:/app
+      - /app/node_modules
+    env_file:
+      - ./env/gateway.env
+    depends_on:
+      - user-service
+      - driver-service
+      - trip-service
+    networks:
+      - uit-go-network
+
+volumes:
+  mongodb_data:
+  redis_data:
+  zookeeper_data:
+  kafka_data:
+
+networks:
+  uit-go-network:
+    driver: bridge
