@@ -5,6 +5,10 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+// Database connection
+const dbConnection = require('./config/database');
+const Trip = require('./models/Trip');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -44,31 +48,50 @@ app.get('/', (req, res) => {
 });
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-    const healthCheck = {
-        service: 'trip-service',
-        status: 'OK',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        environment: process.env.NODE_ENV || 'development',
-        version: process.env.npm_package_version || '1.0.0',
-        dependencies: {
-            mongodb: 'connected', // TODO: Add actual MongoDB health check
-            redis: 'connected',    // TODO: Add actual Redis health check
-            kafka: 'connected',    // TODO: Add actual Kafka health check
-            userService: 'connected',   // TODO: Add actual service health check
-            driverService: 'connected'  // TODO: Add actual service health check
-        },
-        tripStates: [
-            'searching',
-            'accepted',
-            'ongoing',
-            'completed',
-            'cancelled'
-        ]
-    };
+app.get('/health', async (req, res) => {
+    try {
+        // Check MongoDB connection
+        const mongoStatus = dbConnection.isConnected() ? 'connected' : 'disconnected';
 
-    res.status(200).json(healthCheck);
+        const healthCheck = {
+            service: 'trip-service',
+            status: mongoStatus === 'connected' ? 'OK' : 'DEGRADED',
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime(),
+            environment: process.env.NODE_ENV || 'development',
+            version: process.env.npm_package_version || '1.0.0',
+            database: {
+                name: 'uitgo_trips',
+                status: mongoStatus,
+                uri: process.env.MONGODB_URI ? process.env.MONGODB_URI.replace(/\/\/.*@/, '//***:***@') : 'not configured'
+            },
+            dependencies: {
+                mongodb: mongoStatus,
+                redis: 'not configured',
+                kafka: 'not configured',
+                userService: 'not configured',
+                driverService: 'not configured'
+            },
+            tripStates: [
+                'searching',
+                'accepted',
+                'ongoing',
+                'completed',
+                'cancelled'
+            ]
+        };
+
+        const statusCode = mongoStatus === 'connected' ? 200 : 503;
+        res.status(statusCode).json(healthCheck);
+    } catch (error) {
+        console.error('Health check error:', error);
+        res.status(503).json({
+            service: 'trip-service',
+            status: 'ERROR',
+            timestamp: new Date().toISOString(),
+            error: error.message
+        });
+    }
 });
 
 // TODO: Add routes
@@ -113,11 +136,56 @@ app.use('*', (req, res) => {
     });
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`Trip Service running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Health check available at: http://localhost:${PORT}/health`);
-});
+// Start server with database connection
+async function startServer() {
+    try {
+        // Connect to MongoDB
+        console.log('Connecting to MongoDB...');
+        await dbConnection.connect();
+        console.log('Connected to uitgo_trips database');
+
+        // Start HTTP server
+        const server = app.listen(PORT, () => {
+            console.log(`Trip Service running on port ${PORT}`);
+            console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`Health check available at: http://localhost:${PORT}/health`);
+        });
+
+        // Graceful shutdown handling
+        const gracefulShutdown = async (signal) => {
+            console.log(`Received ${signal}. Starting graceful shutdown...`);
+
+            server.close(async () => {
+                console.log('HTTP server closed.');
+
+                try {
+                    await dbConnection.disconnect();
+                    console.log('Database connection closed.');
+                    process.exit(0);
+                } catch (error) {
+                    console.error('Error during database disconnection:', error);
+                    process.exit(1);
+                }
+            });
+
+            // Force close after 30 seconds
+            setTimeout(() => {
+                console.error('Could not close connections in time, forcefully shutting down');
+                process.exit(1);
+            }, 30000);
+        };
+
+        // Listen for termination signals
+        process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+        process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+    } catch (error) {
+        console.error('Failed to start server:', error);
+        process.exit(1);
+    }
+}
+
+// Start the server
+startServer();
 
 module.exports = app;

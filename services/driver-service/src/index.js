@@ -5,6 +5,10 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+// Database connection
+const dbConnection = require('./config/database');
+const Driver = require('./models/Driver');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -44,7 +48,7 @@ app.get('/', (req, res) => {
 });
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
     const healthCheck = {
         service: 'driver-service',
         status: 'OK',
@@ -53,9 +57,8 @@ app.get('/health', (req, res) => {
         environment: process.env.NODE_ENV || 'development',
         version: process.env.npm_package_version || '1.0.0',
         dependencies: {
-            mongodb: 'connected', // TODO: Add actual MongoDB health check
-            redis: 'connected',    // TODO: Add actual Redis health check
-            kafka: 'connected'     // TODO: Add actual Kafka health check
+            mongodb: dbConnection.isConnected() ? 'connected' : 'disconnected',
+            database: 'uitgo_drivers'
         },
         features: {
             geospatial: 'enabled',
@@ -63,26 +66,43 @@ app.get('/health', (req, res) => {
         }
     };
 
-    res.status(200).json(healthCheck);
+    // Set status based on critical dependencies
+    if (!dbConnection.isConnected()) {
+        healthCheck.status = 'DEGRADED';
+        res.status(503);
+    } else {
+        res.status(200);
+    }
+
+    res.json(healthCheck);
 });
 
 // TODO: Add routes
-// Temporary test routes
-app.get('/api/drivers', (req, res) => {
-    res.json({
-        message: 'Driver Service - Drivers endpoint',
-        service: 'driver-service',
-        drivers: [
-            { id: 1, name: 'Driver 1', status: 'online', lat: 10.762622, lng: 106.660172 },
-            { id: 2, name: 'Driver 2', status: 'offline', lat: 10.776889, lng: 106.695244 }
-        ]
-    });
+// Temporary test routes with MongoDB
+app.get('/api/drivers', async (req, res) => {
+    try {
+        const drivers = await Driver.find().limit(10);
+        res.json({
+            message: 'Driver Service - Drivers endpoint',
+            service: 'driver-service',
+            database: 'uitgo_drivers',
+            count: drivers.length,
+            drivers: drivers
+        });
+    } catch (error) {
+        console.error('Error fetching drivers:', error);
+        res.status(500).json({
+            error: 'Database error',
+            message: 'Failed to fetch drivers'
+        });
+    }
 });
 
 app.get('/api/location', (req, res) => {
     res.json({
         message: 'Driver Service - Location endpoint',
         service: 'driver-service',
+        database: 'uitgo_drivers',
         endpoints: ['update', 'track', 'nearby']
     });
 });
@@ -108,11 +128,38 @@ app.use('*', (req, res) => {
     });
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`Driver Service running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Health check available at: http://localhost:${PORT}/health`);
+// Start server with database connection
+async function startServer() {
+    try {
+        // Connect to MongoDB first
+        await dbConnection.connect();
+
+        // Start HTTP server
+        app.listen(PORT, () => {
+            console.log(`Driver Service running on port ${PORT}`);
+            console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`Health check available at: http://localhost:${PORT}/health`);
+            console.log(`Database: uitgo_drivers`);
+        });
+    } catch (error) {
+        console.error('Failed to start Driver Service:', error);
+        process.exit(1);
+    }
+}
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+    console.log('Received SIGINT. Graceful shutdown...');
+    await dbConnection.disconnect();
+    process.exit(0);
 });
+
+process.on('SIGTERM', async () => {
+    console.log('Received SIGTERM. Graceful shutdown...');
+    await dbConnection.disconnect();
+    process.exit(0);
+});
+
+startServer();
 
 module.exports = app;

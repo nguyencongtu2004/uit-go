@@ -5,6 +5,10 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
+// Database connection
+const dbConnection = require('./config/database');
+const User = require('./models/User');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -43,7 +47,7 @@ app.get('/', (req, res) => {
 });
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
     const healthCheck = {
         service: 'user-service',
         status: 'OK',
@@ -52,33 +56,48 @@ app.get('/health', (req, res) => {
         environment: process.env.NODE_ENV || 'development',
         version: process.env.npm_package_version || '1.0.0',
         dependencies: {
-            mongodb: 'connected', // TODO: Add actual MongoDB health check
-            redis: 'connected',    // TODO: Add actual Redis health check
-            kafka: 'connected'     // TODO: Add actual Kafka health check
+            mongodb: dbConnection.isConnected() ? 'connected' : 'disconnected',
+            database: 'uitgo_users'
         }
     };
 
-    res.status(200).json(healthCheck);
+    // Set status based on critical dependencies
+    if (!dbConnection.isConnected()) {
+        healthCheck.status = 'DEGRADED';
+        res.status(503);
+    } else {
+        res.status(200);
+    }
+
+    res.json(healthCheck);
 });
 
 // TODO: Add routes
-// Temporary test route for users
-app.get('/api/users', (req, res) => {
-    res.json({
-        message: 'User Service - Users endpoint',
-        service: 'user-service',
-        users: [
-            { id: 1, name: 'Test User 1', type: 'passenger' },
-            { id: 2, name: 'Test Driver 1', type: 'driver' },
-            { id: 3, name: 'Test Driver 2', type: 'driver' }
-        ]
-    });
+// Temporary test route for users with MongoDB
+app.get('/api/users', async (req, res) => {
+    try {
+        const users = await User.find().select('-passwordHash').limit(10);
+        res.json({
+            message: 'User Service - Users endpoint',
+            service: 'user-service',
+            database: 'uitgo_users',
+            count: users.length,
+            users: users
+        });
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        res.status(500).json({
+            error: 'Database error',
+            message: 'Failed to fetch users'
+        });
+    }
 });
 
 app.get('/api/auth', (req, res) => {
     res.json({
         message: 'User Service - Auth endpoint',
         service: 'user-service',
+        database: 'uitgo_users',
         endpoints: ['login', 'register', 'refresh']
     });
 });
@@ -104,11 +123,38 @@ app.use('*', (req, res) => {
     });
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`User Service running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Health check available at: http://localhost:${PORT}/health`);
+// Start server with database connection
+async function startServer() {
+    try {
+        // Connect to MongoDB first
+        await dbConnection.connect();
+
+        // Start HTTP server
+        app.listen(PORT, () => {
+            console.log(`User Service running on port ${PORT}`);
+            console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`Health check available at: http://localhost:${PORT}/health`);
+            console.log(`Database: uitgo_users`);
+        });
+    } catch (error) {
+        console.error('Failed to start User Service:', error);
+        process.exit(1);
+    }
+}
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+    console.log('Received SIGINT. Graceful shutdown...');
+    await dbConnection.disconnect();
+    process.exit(0);
 });
+
+process.on('SIGTERM', async () => {
+    console.log('Received SIGTERM. Graceful shutdown...');
+    await dbConnection.disconnect();
+    process.exit(0);
+});
+
+startServer();
 
 module.exports = app;

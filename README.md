@@ -9,7 +9,7 @@ UIT-Go là một nền tảng chia sẻ chuyến đi được xây dựng với 
 
 ## 🏗️ Kiến trúc hệ thống
 
-### Microservices Architecture
+### Microservices Architecture với Database Separation
 
 ```
 ┌─────────────────┐
@@ -22,21 +22,143 @@ UIT-Go là một nền tảng chia sẻ chuyến đi được xây dựng với 
 ┌───▼───┐ │ ┌───▼────┐ ┌────▼────┐
 │ User  │ │ │ Driver │ │  Trip   │
 │Service│ │ │Service │ │ Service │
-└───────┘ │ └────────┘ └─────────┘
+└───┬───┘ │ └────┬───┘ └────┬────┘
+    │     │      │          │
+┌───▼───┐ │ ┌────▼────┐ ┌───▼────┐
+│MongoDB│ │ │ MongoDB │ │MongoDB │
+│Users  │ │ │ Drivers │ │ Trips  │
+│:27017 │ │ │ :27018  │ │ :27019 │
+└───────┘ │ └─────────┘ └────────┘
           │
     Docker Network
 ```
 
 ### Services Overview
 
-| Service            | Port   | Chức năng                     | API Endpoints                   |
-| ------------------ | ------ | ----------------------------- | ------------------------------- |
-| **API Gateway**    | 8080   | Proxy & Load Balancing        | `/health`, `/`                  |
-| **User Service**   | 3000\* | Quản lý người dùng & xác thực | `/api/users`, `/api/auth`       |
-| **Driver Service** | 3000\* | Quản lý tài xế & vị trí       | `/api/drivers`, `/api/location` |
-| **Trip Service**   | 3000\* | Quản lý chuyến đi & đặt xe    | `/api/trips`, `/api/booking`    |
+| Service            | Port   | Database        | Chức năng                     | API Endpoints                   |
+| ------------------ | ------ | --------------- | ----------------------------- | ------------------------------- |
+| **API Gateway**    | 8080   | -               | Proxy & Load Balancing        | `/health`, `/`                  |
+| **User Service**   | 3000\* | MongoDB Users   | Quản lý người dùng & xác thực | `/api/users`, `/api/auth`       |
+| **Driver Service** | 3000\* | MongoDB Drivers | Quản lý tài xế & vị trí       | `/api/drivers`, `/api/location` |
+| **Trip Service**   | 3000\* | MongoDB Trips   | Quản lý chuyến đi & đặt xe    | `/api/trips`, `/api/booking`    |
 
 \*Internal Docker network port
+
+### Database Architecture
+
+| Database Container  | Port  | Database Name | Chức năng                   |
+| ------------------- | ----- | ------------- | --------------------------- |
+| **mongodb-users**   | 27017 | uitgo_users   | User data & authentication  |
+| **mongodb-drivers** | 27018 | uitgo_drivers | Driver data & geolocation   |
+| **mongodb-trips**   | 27019 | uitgo_trips   | Trip data & booking history |
+
+### Database Models & Schemas
+
+#### User Model (uitgo_users)
+
+```javascript
+{
+  _id: ObjectId,
+  email: String (unique, required),
+  password: String (hashed, required),
+  profile: {
+    firstName: String (required),
+    lastName: String (required),
+    phone: String (unique, required),
+    avatar: String,
+    dateOfBirth: Date
+  },
+  role: String (enum: ['passenger', 'driver', 'admin'], default: 'passenger'),
+  status: String (enum: ['active', 'inactive', 'suspended'], default: 'active'),
+  preferences: {
+    language: String (default: 'vi'),
+    notifications: Boolean (default: true)
+  },
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+#### Driver Model (uitgo_drivers)
+
+```javascript
+{
+  _id: ObjectId,
+  userId: ObjectId (ref: 'User', required),
+  driverInfo: {
+    licenseNumber: String (unique, required),
+    licenseExpiry: Date (required),
+    experience: Number,
+    rating: Number (default: 5.0),
+    totalTrips: Number (default: 0)
+  },
+  vehicle: {
+    make: String (required),
+    model: String (required),
+    year: Number (required),
+    licensePlate: String (unique, required),
+    color: String (required),
+    type: String (enum: ['bike', 'car'], required)
+  },
+  location: {
+    type: String (default: 'Point'),
+    coordinates: [Number] // [longitude, latitude]
+  },
+  status: String (enum: ['online', 'offline', 'busy'], default: 'offline'),
+  documents: {
+    avatar: String,
+    licensePhoto: String,
+    vehiclePhoto: String
+  },
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+#### Trip Model (uitgo_trips)
+
+```javascript
+{
+  _id: ObjectId,
+  passengerId: ObjectId (ref: 'User', required),
+  driverId: ObjectId (ref: 'Driver'),
+  pickup: {
+    address: String (required),
+    location: {
+      type: String (default: 'Point'),
+      coordinates: [Number] // [longitude, latitude]
+    }
+  },
+  destination: {
+    address: String (required),
+    location: {
+      type: String (default: 'Point'),
+      coordinates: [Number]
+    }
+  },
+  status: String (enum: ['searching', 'accepted', 'ongoing', 'completed', 'cancelled']),
+  pricing: {
+    baseFare: Number,
+    distanceFare: Number,
+    timeFare: Number,
+    totalFare: Number,
+    paymentMethod: String (enum: ['cash', 'card', 'wallet'])
+  },
+  timeline: {
+    requestedAt: Date (required),
+    acceptedAt: Date,
+    startedAt: Date,
+    completedAt: Date
+  },
+  route: {
+    distance: Number, // in meters
+    duration: Number, // in seconds
+    polyline: String
+  },
+  createdAt: Date,
+  updatedAt: Date
+}
+```
 
 ## 🚀 Quick Start
 
@@ -117,10 +239,9 @@ GET /api/users
 {
   "message": "User Service - Users endpoint",
   "service": "user-service",
-  "users": [
-    { "id": 1, "name": "Test User 1", "type": "passenger" },
-    { "id": 2, "name": "Test Driver 1", "type": "driver" }
-  ]
+  "database": "uitgo_users",
+  "count": 0,
+  "users": []
 }
 ```
 
@@ -154,22 +275,9 @@ GET /api/drivers
 {
   "message": "Driver Service - Drivers endpoint",
   "service": "driver-service",
-  "drivers": [
-    {
-      "id": 1,
-      "name": "Driver 1",
-      "status": "online",
-      "lat": 10.762622,
-      "lng": 106.660172
-    },
-    {
-      "id": 2,
-      "name": "Driver 2",
-      "status": "offline",
-      "lat": 10.776889,
-      "lng": 106.695244
-    }
-  ]
+  "database": "uitgo_drivers",
+  "count": 0,
+  "drivers": []
 }
 ```
 
@@ -262,13 +370,34 @@ uit-go/
 │   │   ├── package.json
 │   │   └── src/
 │   │       ├── index.js
+│   │       ├── config/
+│   │       │   └── database.js
+│   │       ├── models/
+│   │       │   └── User.js
 │   │       ├── routes/
-│   │       ├── controllers/
-│   │       └── models/
+│   │       └── controllers/
 │   ├── driver-service/
-│   │   └── ... (same structure)
+│   │   ├── Dockerfile
+│   │   ├── package.json
+│   │   └── src/
+│   │       ├── index.js
+│   │       ├── config/
+│   │       │   └── database.js
+│   │       ├── models/
+│   │       │   └── Driver.js
+│   │       ├── routes/
+│   │       └── controllers/
 │   └── trip-service/
-│       └── ... (same structure)
+│       ├── Dockerfile
+│       ├── package.json
+│       └── src/
+│           ├── index.js
+│           ├── config/
+│           │   └── database.js
+│           ├── models/
+│           │   └── Trip.js
+│           ├── routes/
+│           └── controllers/
 ├── common/                # Shared utilities
 └── config/               # Configuration files
 ```
@@ -354,11 +483,21 @@ docker compose -f docker-compose.prod.yaml up --build -d
 - Set appropriate `NODE_ENV=production`
 - Configure external databases (MongoDB, Redis, Kafka)
 
-### Infrastructure Services (Future)
+### Infrastructure Services (Current)
+
+Project hiện tại đã tích hợp:
+
+- **MongoDB**: 3 separate databases per service
+  - `mongodb-users` (Port 27017): User authentication & profiles
+  - `mongodb-drivers` (Port 27018): Driver data & geolocation
+  - `mongodb-trips` (Port 27019): Trip history & booking
+- **Mongoose**: ODM for MongoDB with schema validation
+- **Docker Compose**: Container orchestration
+
+### Future Infrastructure
 
 Project được chuẩn bị cho:
 
-- **MongoDB**: Database storage
 - **Redis**: Caching layer
 - **Kafka**: Message broker
 - **Elasticsearch**: Search & analytics
@@ -371,8 +510,22 @@ Project được chuẩn bị cho:
 # Check all services
 curl http://localhost:8080/health
 
-# Check individual service health
-docker exec uit-go-user-service curl http://localhost:3000/health
+# Check individual services
+curl http://localhost:8080/api/users/    # User service status
+curl http://localhost:8080/api/drivers/  # Driver service status
+curl http://localhost:8080/api/trips/    # Trip service status
+```
+
+### Database Connection Status
+
+```bash
+# Check MongoDB containers
+docker ps | grep mongodb
+
+# Check database connections in logs
+docker compose logs user-service | grep MongoDB
+docker compose logs driver-service | grep MongoDB
+docker compose logs trip-service | grep MongoDB
 ```
 
 ### Logs
@@ -456,6 +609,28 @@ docker compose up --build <service-name>
 ```bash
 # Test internal connectivity
 docker exec uit-go-gateway curl http://user-service:3000/health
+
+# Test MongoDB connections
+docker exec uit-go-user-service curl http://localhost:3000/health
+docker exec uit-go-driver-service curl http://localhost:3000/health
+docker exec uit-go-trip-service curl http://localhost:3000/health
+```
+
+**Database connectivity issues:**
+
+```bash
+# Check MongoDB container status
+docker ps | grep mongodb
+
+# Check database logs
+docker compose logs mongodb-users
+docker compose logs mongodb-drivers
+docker compose logs mongodb-trips
+
+# Test database connections
+docker exec uit-go-mongodb-users mongosh --eval "db.adminCommand('ismaster')"
+docker exec uit-go-mongodb-drivers mongosh --eval "db.adminCommand('ismaster')"
+docker exec uit-go-mongodb-trips mongosh --eval "db.adminCommand('ismaster')"
 ```
 
 ## 📜 License
