@@ -69,7 +69,8 @@ app.get('/api/users', (req, res) => {
         service: 'user-service',
         users: [
             { id: 1, name: 'Test User 1', type: 'passenger' },
-            { id: 2, name: 'Test Driver 1', type: 'driver' }
+            { id: 2, name: 'Test Driver 1', type: 'driver' },
+            { id: 3, name: 'Test Driver 2', type: 'driver' }
         ]
     });
 });
