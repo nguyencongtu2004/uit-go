@@ -45,54 +45,41 @@ services:
     networks:
       - uit-go-network
 
-  # # Caching Service
-  # redis:
-  #   image: redis:7.2-alpine
-  #   container_name: uit-go-redis
-  #   restart: unless-stopped
-  #   ports:
-  #     - "6379:6379"
-  #   command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123}
-  #   volumes:
-  #     - redis_data:/data
-  #   networks:
-  #     - uit-go-network
+  # Caching Service
+  redis:
+    image: redis:8.2.1-alpine
+    container_name: uit-go-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379" # default Redis port
+    command: redis-server --appendonly yes --requirepass redis123
+    volumes:
+      - redis_data:/data
+    networks:
+      - uit-go-network
 
-  # # Message Broker Services
-  # zookeeper:
-  #   image: confluentinc/cp-zookeeper:7.4.0
-  #   container_name: uit-go-zookeeper
-  #   restart: unless-stopped
-  #   environment:
-  #     ZOOKEEPER_CLIENT_PORT: 2181
-  #     ZOOKEEPER_TICK_TIME: 2000
-  #   volumes:
-  #     - zookeeper_data:/var/lib/zookeeper/data
-  #   networks:
-  #     - uit-go-network
-
-  # kafka:
-  #   image: confluentinc/cp-kafka:7.4.0
-  #   container_name: uit-go-kafka
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - zookeeper
-  #   ports:
-  #     - "9092:9092"
-  #     - "9094:9094"
-  #   environment:
-  #     KAFKA_BROKER_ID: 1
-  #     KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
-  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-  #     KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-  #     KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-  #     KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-  #   volumes:
-  #     - kafka_data:/var/lib/kafka/data
-  #   networks:
-  #     - uit-go-network
+  # Message Broker Services - Kafka in KRaft mode (không cần Zookeeper)
+  kafka:
+    image: confluentinc/cp-kafka:8.0.0   # Kafka >= 2.8 (hỗ trợ KRaft)
+    container_name: kafka
+    ports:
+      - "9092:9092"   # client access
+      - "9093:9093"   # inter-broker communication
+    environment:
+      # KRaft mode config
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk  # random unique ID (chạy `kafka-storage.sh random-uuid`)
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - uit-go-network
 
   # Application Services
   user-service:
@@ -106,6 +93,8 @@ services:
       - ./env/user-service.env
     depends_on:
       - mongodb-users
+      - kafka
+      - redis
     networks:
       - uit-go-network
     labels:
@@ -126,6 +115,8 @@ services:
       - ./env/driver-service.env
     depends_on:
       - mongodb-drivers
+      - kafka
+      - redis
     networks:
       - uit-go-network
     labels:
@@ -146,6 +137,8 @@ services:
       - ./env/trip-service.env
     depends_on:
       - mongodb-trips
+      - kafka
+      - redis
     networks:
       - uit-go-network
     labels:
@@ -157,7 +150,7 @@ services:
 
   # Traefik Reverse Proxy & Load Balancer
   traefik:
-    image: traefik:v3.0
+    image: traefik:v3.5.2
     container_name: uit-go-traefik
     restart: unless-stopped
     ports:
@@ -166,8 +159,8 @@ services:
       - "8080:8080" # Traefik Dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ./config/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./config/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
       - traefik_data:/etc/traefik
     command:
       - --configfile=/etc/traefik/traefik.yml
@@ -188,9 +181,8 @@ volumes:
   mongodb_drivers_data:
   mongodb_trips_data:
   traefik_data:
-  redis_data:
-  zookeeper_data:
   kafka_data:
+  redis_data:
 
 networks:
   uit-go-network:
