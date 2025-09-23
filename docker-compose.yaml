@@ -154,7 +154,7 @@ services:
     container_name: uit-go-traefik
     restart: unless-stopped
     ports:
-      - "8000:8000" # HTTP (changed from 80 to 8000 for Windows compatibility)
+      - "80:80" # HTTP
       - "443:443" # HTTPS (for production)
       - "8080:8080" # Traefik Dashboard
     volumes:

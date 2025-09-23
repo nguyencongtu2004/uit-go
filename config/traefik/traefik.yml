@@ -15,7 +15,7 @@ api:
 # Entry Points Configuration
 entryPoints:
   web:
-    address: ":8000" # Changed from 80 to 8000 for Windows compatibility
+    address: ":80"
   websecure:
     address: ":443"
   traefik:
