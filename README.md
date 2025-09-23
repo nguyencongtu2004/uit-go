@@ -9,40 +9,51 @@ UIT-Go là một nền tảng chia sẻ chuyến đi được xây dựng với 
 
 ## 🏗️ Kiến trúc hệ thống
 
-### Microservices Architecture với Database Separation
+### Microservices Architecture với Traefik Reverse Proxy
 
 ```
-┌─────────────────┐
-│   API Gateway   │ ← Port 8080 (External)
-│   (Port 3000)   │
-└─────────┬───────┘
-          │
-    ┌─────┼─────┐
-    │     │     │
-┌───▼───┐ │ ┌───▼────┐ ┌────▼────┐
-│ User  │ │ │ Driver │ │  Trip   │
-│Service│ │ │Service │ │ Service │
-└───┬───┘ │ └────┬───┘ └────┬────┘
-    │     │      │          │
-┌───▼───┐ │ ┌────▼────┐ ┌───▼────┐
-│MongoDB│ │ │ MongoDB │ │MongoDB │
-│Users  │ │ │ Drivers │ │ Trips  │
-│:27017 │ │ │ :27018  │ │ :27019 │
-└───────┘ │ └─────────┘ └────────┘
-          │
-    Docker Network
+                    ┌─────────────────┐
+                    │   Traefik       │ ← Port 80/443 (HTTP/HTTPS)
+                    │  Reverse Proxy  │ ← Port 8080 (Dashboard)
+                    │  Load Balancer  │
+                    └─────────┬───────┘
+                              │
+                ┌─────────────┼─────────────┐
+                │             │             │
+            ┌───▼───┐     ┌───▼────┐    ┌───▼────┐
+            │ User  │     │ Driver │    │  Trip  │
+            │Service│     │Service │    │Service │
+            │:3000  │     │ :3000  │    │ :3000  │
+            └───┬───┘     └────┬───┘    └────┬───┘
+                │              │             │
+            ┌───▼───┐     ┌────▼────┐   ┌────▼───┐
+            │MongoDB│     │ MongoDB │   │MongoDB │
+            │Users  │     │ Drivers │   │ Trips  │
+            │:27017 │     │ :27018  │   │ :27019 │
+            └───────┘     └─────────┘   └────────┘
+                              │
+                        Docker Network
 ```
 
 ### Services Overview
 
-| Service            | Port   | Database        | Chức năng                     | API Endpoints                   |
-| ------------------ | ------ | --------------- | ----------------------------- | ------------------------------- |
-| **API Gateway**    | 8080   | -               | Proxy & Load Balancing        | `/health`, `/`                  |
-| **User Service**   | 3000\* | MongoDB Users   | Quản lý người dùng & xác thực | `/api/users`, `/api/auth`       |
-| **Driver Service** | 3000\* | MongoDB Drivers | Quản lý tài xế & vị trí       | `/api/drivers`, `/api/location` |
-| **Trip Service**   | 3000\* | MongoDB Trips   | Quản lý chuyến đi & đặt xe    | `/api/trips`, `/api/booking`    |
+| Service            | Internal Port | External Access | Database        | Chức năng                     |
+| ------------------ | ------------- | --------------- | --------------- | ----------------------------- |
+| **Traefik Proxy**  | 80, 443, 8080 | ✓               | -               | Reverse Proxy & Load Balancer |
+| **User Service**   | 3000          | via Traefik     | MongoDB Users   | Quản lý người dùng & xác thực |
+| **Driver Service** | 3000          | via Traefik     | MongoDB Drivers | Quản lý tài xế & vị trí       |
+| **Trip Service**   | 3000          | via Traefik     | MongoDB Trips   | Quản lý chuyến đi & đặt xe    |
 
-\*Internal Docker network port
+### Traefik Routing Configuration
+
+| Route Pattern     | Target Service | Middleware Applied         |
+| ----------------- | -------------- | -------------------------- |
+| `/api/users/*`    | user-service   | CORS, Security, Rate Limit |
+| `/api/auth/*`     | user-service   | CORS, Security, Rate Limit |
+| `/api/drivers/*`  | driver-service | CORS, Security, Rate Limit |
+| `/api/location/*` | driver-service | CORS, Security, Rate Limit |
+| `/api/trips/*`    | trip-service   | CORS, Security, Rate Limit |
+| `/api/booking/*`  | trip-service   | CORS, Security, Rate Limit |
 
 ### Database Architecture
 
@@ -185,17 +196,33 @@ docker compose up --build
 
 # Hoặc chạy background
 docker compose up --build -d
+
+# Sử dụng management script (Windows)
+.\manage.ps1 start
+
+# Sử dụng management script (Linux/Mac)
+./manage.sh start
 ```
 
 3. **Verify installation**
 
 ```bash
-# Check API Gateway
-curl http://localhost:8080/health
+# Check Traefik dashboard
+curl http://localhost:8080/ping
 
-# Check available routes
-curl http://localhost:8080/
+# Check API endpoints via Traefik
+curl http://localhost/api/users
+curl http://localhost/api/drivers
+curl http://localhost/api/trips
 ```
+
+### Access Points
+
+- **Main API**: http://localhost (via Traefik)
+- **Traefik Dashboard**: http://localhost:8080
+- **MongoDB Users**: localhost:27017
+- **MongoDB Drivers**: localhost:27018
+- **MongoDB Trips**: localhost:27019
 
 ### Environment Variables
 
@@ -203,7 +230,7 @@ Project sử dụng environment files cho từng service:
 
 ```
 env/
-├── gateway.env          # API Gateway config
+├── traefik.env          # Traefik configuration
 ├── user-service.env     # User service config
 ├── driver-service.env   # Driver service config
 └── trip-service.env     # Trip service config
@@ -211,18 +238,22 @@ env/
 
 ## 📋 API Documentation
 
-### API Gateway (http://localhost:8080)
+### Access via Traefik (http://localhost)
+
+All API endpoints are now accessible through Traefik reverse proxy at port 80 (HTTP) or 443 (HTTPS in production).
+
+#### Traefik Dashboard
+
+```http
+GET http://localhost:8080
+```
+
+Access the Traefik dashboard to monitor services, routes, and health status.
 
 #### Health Check
 
 ```http
-GET /health
-```
-
-#### Service Information
-
-```http
-GET /
+GET http://localhost:8080/ping
 ```
 
 ### User Service
@@ -230,7 +261,7 @@ GET /
 #### Get Users
 
 ```http
-GET /api/users
+GET http://localhost/api/users
 ```
 
 **Response:**
@@ -248,7 +279,7 @@ GET /api/users
 #### Authentication
 
 ```http
-GET /api/auth
+GET http://localhost/api/auth
 ```
 
 **Response:**
@@ -346,25 +377,82 @@ GET /api/booking
 
 ## 🛠️ Development
 
+### Traefik Management
+
+Project này đã được tích hợp với Traefik reverse proxy thay vì API Gateway truyền thống. Traefik cung cấp:
+
+- **Automatic Service Discovery**: Tự động phát hiện services qua Docker labels
+- **Load Balancing**: Phân tải tự động cho multiple instances
+- **SSL Termination**: Hỗ trợ HTTPS với Let's Encrypt
+- **Dashboard**: Web UI để monitoring và debugging
+- **Middleware**: Rate limiting, CORS, security headers, compression
+
+#### Management Scripts
+
+**Windows (PowerShell):**
+
+```powershell
+# Start all services
+.\manage.ps1 start
+
+# Check health
+.\manage.ps1 health
+
+# View logs
+.\manage.ps1 logs traefik
+
+# Stop all services
+.\manage.ps1 stop
+```
+
+**Linux/Mac (Bash):**
+
+```bash
+# Start all services
+./manage.sh start
+
+# Check health
+./manage.sh health
+
+# View logs
+./manage.sh logs traefik
+
+# Stop all services
+./manage.sh stop
+```
+
+#### Traefik Dashboard
+
+Access Traefik dashboard at: http://localhost:8080
+
+The dashboard provides:
+
+- Real-time service status
+- Request metrics
+- Route configuration
+- Health checks
+- Error tracking
+
 ### Folder Structure
 
 ```
 uit-go/
-├── docker-compose.yaml      # Container orchestration
-├── package.json            # Root package file
-├── README.md              # This file
-├── .gitignore             # Git ignore rules
-├── env/                   # Environment configurations
-│   ├── gateway.env
+├── docker-compose.yaml          # Container orchestration với Traefik
+├── traefik.yml                  # Traefik main configuration
+├── dynamic.yml                  # Traefik dynamic routing rules
+├── traefik.prod.yml            # Production Traefik config
+├── docker-compose.healthcheck.yml # Health check utilities
+├── manage.ps1                  # Windows management script
+├── manage.sh                   # Linux/Mac management script
+├── package.json                # Root package file
+├── README.md                   # This file
+├── .gitignore                  # Git ignore rules
+├── env/                        # Environment configurations
+│   ├── traefik.env            # Traefik environment variables
 │   ├── user-service.env
 │   ├── driver-service.env
 │   └── trip-service.env
-├── gateway/               # API Gateway service
-│   ├── Dockerfile
-│   ├── package.json
-│   └── src/
-│       └── index.js
-├── services/              # Microservices
+├── services/                   # Microservices
 │   ├── user-service/
 │   │   ├── Dockerfile
 │   │   ├── package.json
@@ -398,8 +486,8 @@ uit-go/
 │           │   └── Trip.js
 │           ├── routes/
 │           └── controllers/
-├── common/                # Shared utilities
-└── config/               # Configuration files
+├── common/                     # Shared utilities
+└── config/                    # Configuration files
 ```
 
 ### Local Development
@@ -418,13 +506,14 @@ npm install
 npm run dev
 ```
 
-#### Docker commands
+### Docker commands
 
 ```bash
 # Xem logs của tất cả services
 docker compose logs
 
 # Xem logs của service cụ thể
+docker compose logs traefik
 docker compose logs user-service
 
 # Restart service
@@ -435,6 +524,9 @@ docker compose down
 
 # Rebuild service
 docker compose up --build user-service
+
+# Run health check
+docker compose -f docker-compose.healthcheck.yml up
 ```
 
 ### Hot Reloading
@@ -443,24 +535,50 @@ Project được cấu hình với volume mounting cho hot reloading:
 
 - Changes trong `src/` sẽ tự động restart service
 - Không cần rebuild Docker image khi dev
+- Traefik tự động update routing khi services restart
 
 ## 🔧 Configuration
+
+### Traefik Configuration
+
+**Main Configuration (`traefik.yml`):**
+
+- Entry points (HTTP/HTTPS)
+- Docker provider for service discovery
+- Dashboard and API settings
+- SSL certificate resolvers
+
+**Dynamic Configuration (`dynamic.yml`):**
+
+- Middleware definitions (CORS, security, rate limiting)
+- Static routes (if needed)
+- Load balancing algorithms
+
+**Production Configuration (`traefik.prod.yml`):**
+
+- HTTPS redirects
+- Let's Encrypt SSL certificates
+- Enhanced security settings
+- Logging and monitoring
 
 ### Docker Compose
 
 Services được cấu hình với:
 
 - **Networks**: Internal communication qua `uit-go-network`
-- **Volumes**: Code mounting cho development
-- **Environment**: Separate env files cho mỗi service
-- **Dependencies**: Gateway depends on all services
+- **Volumes**: Code mounting cho development + Traefik config
+- **Labels**: Traefik routing và middleware configuration
+- **Dependencies**: Traefik depends on all microservices
 
 ### Security Features
 
-- **Helmet.js**: HTTP security headers
+Traefik cung cấp built-in security:
+
+- **Automatic HTTPS**: Let's Encrypt integration
+- **Security Headers**: HSTS, CSP, X-Frame-Options
+- **Rate Limiting**: Request throttling per IP
 - **CORS**: Cross-origin resource sharing
-- **Rate Limiting**: Request throttling
-- **Input Validation**: JSON parsing limits
+- **Load Balancing**: Health check và failover
 
 ### Performance
 
@@ -470,23 +588,46 @@ Services được cấu hình với:
 
 ## 🐳 Production Deployment
 
-### Docker Production
+### Traefik Production Setup
 
 ```bash
-# Production build
-docker compose -f docker-compose.prod.yaml up --build -d
+# Use production configuration
+docker compose up --build -d
+
+# For production with SSL
+cp traefik.prod.yml traefik.yml
+docker compose up --build -d
 ```
 
 ### Environment Setup
 
-- Copy `.env.example` files và configure production values
-- Set appropriate `NODE_ENV=production`
-- Configure external databases (MongoDB, Redis, Kafka)
+- Copy environment files và configure production values
+- Set appropriate `NODE_ENV=production` in service env files
+- Configure external databases (MongoDB)
+- Update `traefik.prod.yml` với your domain và email
+
+### SSL/HTTPS Configuration
+
+Traefik tự động handle SSL certificates:
+
+1. **Configure domain** trong `traefik.prod.yml`
+2. **Set email** cho Let's Encrypt notifications
+3. **Enable HTTPS redirect** trong production config
+4. **Update service labels** với HTTPS entrypoints
+
+```yaml
+# Example production service labels
+labels:
+  - "traefik.http.routers.user-service.rule=Host(`api.yourdomain.com`) && PathPrefix(`/api/users`)"
+  - "traefik.http.routers.user-service.entrypoints=websecure"
+  - "traefik.http.routers.user-service.tls.certresolver=letsencrypt"
+```
 
 ### Infrastructure Services (Current)
 
 Project hiện tại đã tích hợp:
 
+- **Traefik v3.0**: Modern reverse proxy với auto-discovery
 - **MongoDB**: 3 separate databases per service
   - `mongodb-users` (Port 27017): User authentication & profiles
   - `mongodb-drivers` (Port 27018): Driver data & geolocation
@@ -507,13 +648,20 @@ Project được chuẩn bị cho:
 ### Health Checks
 
 ```bash
-# Check all services
-curl http://localhost:8080/health
+# Check Traefik status
+curl http://localhost:8080/ping
 
-# Check individual services
-curl http://localhost:8080/api/users/    # User service status
-curl http://localhost:8080/api/drivers/  # Driver service status
-curl http://localhost:8080/api/trips/    # Trip service status
+# Check service discovery
+curl http://localhost:8080/api/rawdata
+
+# Check API endpoints through Traefik
+curl http://localhost/api/users    # User service status
+curl http://localhost/api/drivers  # Driver service status
+curl http://localhost/api/trips    # Trip service status
+
+# Use management script
+.\manage.ps1 health  # Windows
+./manage.sh health   # Linux/Mac
 ```
 
 ### Database Connection Status
@@ -564,23 +712,26 @@ docker stats
 - Add health checks to new services
 - Update documentation for API changes
 
-## 📝 API Testing
+### API Testing
 
 ### Using cURL
 
 ```bash
-# Test all endpoints
-curl http://localhost:8080/api/users
-curl http://localhost:8080/api/drivers
-curl http://localhost:8080/api/trips
-curl http://localhost:8080/api/auth
-curl http://localhost:8080/api/booking
-curl http://localhost:8080/api/location
+# Test all endpoints via Traefik
+curl http://localhost/api/users
+curl http://localhost/api/drivers
+curl http://localhost/api/trips
+curl http://localhost/api/auth
+curl http://localhost/api/booking
+curl http://localhost/api/location
+
+# Test Traefik dashboard
+curl http://localhost:8080/ping
 ```
 
 ### Using Postman
 
-Import collection với base URL: `http://localhost:8080`
+Import collection với base URL: `http://localhost`
 
 ## 🐛 Troubleshooting
 
@@ -589,8 +740,10 @@ Import collection với base URL: `http://localhost:8080`
 **Port already in use:**
 
 ```bash
-# Check port usage
+# Check port usage (Windows)
+netstat -ano | findstr :80
 netstat -ano | findstr :8080
+
 # Kill process if needed
 taskkill /PID <PID> /F
 ```
@@ -599,21 +752,36 @@ taskkill /PID <PID> /F
 
 ```bash
 # Check logs
+docker compose logs traefik
 docker compose logs <service-name>
+
 # Rebuild container
 docker compose up --build <service-name>
+```
+
+**Traefik routing issues:**
+
+```bash
+# Check Traefik dashboard
+curl http://localhost:8080/api/rawdata
+
+# Verify service labels
+docker inspect <container-name>
+
+# Check service discovery
+docker compose logs traefik | grep "Adding service"
 ```
 
 **Network connectivity:**
 
 ```bash
 # Test internal connectivity
-docker exec uit-go-gateway curl http://user-service:3000/health
+docker exec uit-go-traefik curl http://user-service:3000
 
-# Test MongoDB connections
-docker exec uit-go-user-service curl http://localhost:3000/health
-docker exec uit-go-driver-service curl http://localhost:3000/health
-docker exec uit-go-trip-service curl http://localhost:3000/health
+# Test via Traefik
+curl http://localhost/api/users
+curl http://localhost/api/drivers
+curl http://localhost/api/trips
 ```
 
 **Database connectivity issues:**

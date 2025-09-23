@@ -99,8 +99,6 @@ services:
     build: ./services/user-service
     container_name: uit-go-user-service
     restart: unless-stopped
-    # ports:
-    #   - "3001:3000"
     volumes:
       - ./services/user-service:/app
       - /app/node_modules
@@ -110,13 +108,17 @@ services:
       - mongodb-users
     networks:
       - uit-go-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.user-service.rule=PathPrefix(`/api/users`) || PathPrefix(`/api/auth`)"
+      - "traefik.http.routers.user-service.entrypoints=web"
+      - "traefik.http.services.user-service.loadbalancer.server.port=3000"
+      - "traefik.docker.network=uit-go_uit-go-network"
 
   driver-service:
     build: ./services/driver-service
     container_name: uit-go-driver-service
     restart: unless-stopped
-    # ports:
-    #   - "3002:3000"
     volumes:
       - ./services/driver-service:/app
       - /app/node_modules
@@ -126,13 +128,17 @@ services:
       - mongodb-drivers
     networks:
       - uit-go-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.driver-service.rule=PathPrefix(`/api/drivers`) || PathPrefix(`/api/location`)"
+      - "traefik.http.routers.driver-service.entrypoints=web"
+      - "traefik.http.services.driver-service.loadbalancer.server.port=3000"
+      - "traefik.docker.network=uit-go_uit-go-network"
 
   trip-service:
     build: ./services/trip-service
     container_name: uit-go-trip-service
     restart: unless-stopped
-    # ports:
-    #   - "3003:3000"
     volumes:
       - ./services/trip-service:/app
       - /app/node_modules
@@ -142,29 +148,46 @@ services:
       - mongodb-trips
     networks:
       - uit-go-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.trip-service.rule=PathPrefix(`/api/trips`) || PathPrefix(`/api/booking`)"
+      - "traefik.http.routers.trip-service.entrypoints=web"
+      - "traefik.http.services.trip-service.loadbalancer.server.port=3000"
+      - "traefik.docker.network=uit-go_uit-go-network"
 
-  gateway:
-    build: ./gateway
-    container_name: uit-go-gateway
+  # Traefik Reverse Proxy & Load Balancer
+  traefik:
+    image: traefik:v3.0
+    container_name: uit-go-traefik
     restart: unless-stopped
     ports:
-      - "8080:3000"
+      - "8000:8000" # HTTP (changed from 80 to 8000 for Windows compatibility)
+      - "443:443" # HTTPS (for production)
+      - "8080:8080" # Traefik Dashboard
     volumes:
-      - ./gateway:/app
-      - /app/node_modules
-    env_file:
-      - ./env/gateway.env
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - traefik_data:/etc/traefik
+    command:
+      - --configfile=/etc/traefik/traefik.yml
     depends_on:
       - user-service
       - driver-service
       - trip-service
     networks:
       - uit-go-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.localhost`) || PathPrefix(`/traefik`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=web"
+      - "traefik.http.services.traefik-dashboard.loadbalancer.server.port=8080"
 
 volumes:
   mongodb_users_data:
   mongodb_drivers_data:
   mongodb_trips_data:
+  traefik_data:
   redis_data:
   zookeeper_data:
   kafka_data:

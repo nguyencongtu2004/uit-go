@@ -1,0 +1,39 @@
+# Dynamic Configuration for Traefik
+# This file contains dynamic routing rules and middleware
+
+# HTTP Routers
+http:
+  # Middlewares
+  middlewares:
+    # Rate limiting middleware
+    rate-limit:
+      rateLimit:
+        burst: 100
+        period: 1m
+
+    # CORS middleware
+    cors-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        accessControlAllowOriginList:
+          - "*"
+        accessControlAllowHeaders:
+          - "*"
+        accessControlExposeHeaders:
+          - "*"
+        accessControlMaxAge: 86400
+
+# TCP/UDP configurations (if needed in the future)
+tcp:
+  routers: {}
+  services: {}
+
+udp:
+  routers: {}
+  services: {}
