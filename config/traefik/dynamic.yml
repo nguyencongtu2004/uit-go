@@ -1,18 +1,28 @@
 # Dynamic Configuration for Traefik
 # This file contains dynamic routing rules and middleware
 
-# HTTP Routers
+# HTTP Configuration
 http:
   # Middlewares
   middlewares:
-    # Rate limiting middleware
-    rate-limit:
-      rateLimit:
-        burst: 100
-        period: 1m
+    # Security Headers
+    security-headers:
+      headers:
+        frameDeny: true
+        sslRedirect: false # Set to true in production
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: false # Set to true in production with HTTPS
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+        customResponseHeaders:
+          X-Robots-Tag: "noindex,nofollow,nosnippet,noarchive"
 
-    # CORS middleware
-    cors-headers:
+    # CORS middleware for API endpoints
+    api-cors:
       headers:
         accessControlAllowMethods:
           - GET
@@ -24,16 +34,170 @@ http:
         accessControlAllowOriginList:
           - "*"
         accessControlAllowHeaders:
-          - "*"
+          - "Content-Type"
+          - "Authorization"
+          - "X-Requested-With"
+          - "Accept"
+          - "Origin"
+          - "Cache-Control"
+          - "X-File-Name"
         accessControlExposeHeaders:
-          - "*"
+          - "Content-Length"
+          - "Content-Range"
+          - "X-Total-Count"
+        accessControlAllowCredentials: true
         accessControlMaxAge: 86400
 
-# TCP/UDP configurations (if needed in the future)
+    # Rate limiting middleware - Default
+    default-ratelimit:
+      rateLimit:
+        average: 100
+        burst: 200
+        period: 1m
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    # Rate limiting middleware - Strict (for authentication endpoints)
+    auth-ratelimit:
+      rateLimit:
+        average: 10
+        burst: 20
+        period: 1m
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    # Rate limiting middleware - Relaxed (for location updates)
+    location-ratelimit:
+      rateLimit:
+        average: 1000
+        burst: 2000
+        period: 1m
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    # Compression middleware
+    compression:
+      compress:
+        excludedContentTypes:
+          - "text/event-stream"
+
+    # Request/Response size limits
+    buffering:
+      maxRequestBodyBytes: 10485760 # 10MB
+      memRequestBodyBytes: 2097152 # 2MB
+      maxResponseBodyBytes: 10485760 # 10MB
+      memResponseBodyBytes: 2097152 # 2MB
+
+    # IP Whitelist for admin operations (adjust for your network)
+    admin-whitelist:
+      ipWhiteList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "10.0.0.0/8"
+          - "172.16.0.0/12"
+          - "192.168.0.0/16"
+
+    # Retry middleware
+    retry:
+      retry:
+        attempts: 3
+
+    # Circuit breaker
+    circuit-breaker:
+      circuitBreaker:
+        expression: "NetworkErrorRatio() > 0.30"
+
+    # Request timeout
+    timeout:
+      timeout: 30s
+
+    # Strip prefix middleware (if needed)
+    api-strip-prefix:
+      stripPrefix:
+        prefixes:
+          - "/api/v1"
+
+    # Redirect to HTTPS (for production)
+    https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+    # Health check middleware
+    health-check:
+      addPrefix:
+        prefix: "/health"
+
+  # Routers
+  routers:
+    # Dashboard access with authentication in production
+    traefik-dashboard:
+      rule: "Host(`traefik.localhost`) || PathPrefix(`/dashboard`) || PathPrefix(`/api`)"
+      entryPoints:
+        - "traefik"
+      service: api@internal
+      middlewares:
+        - "security-headers"
+        # - "admin-whitelist" # Uncomment for IP restriction
+
+    # Default API router with common middlewares
+    api-default:
+      rule: "PathPrefix(`/api`)"
+      entryPoints:
+        - "web"
+      middlewares:
+        - "security-headers"
+        - "api-cors"
+        - "compression"
+        - "default-ratelimit"
+        - "buffering"
+        - "retry"
+        - "timeout"
+
+  # Services (for manual service definition if needed)
+  services:
+    # Example manual service configuration
+    # user-service-manual:
+    #   loadBalancer:
+    #     servers:
+    #       - url: "http://user-service:3000"
+    #     healthCheck:
+    #       path: "/health"
+    #       interval: "30s"
+    #       timeout: "5s"
+    #       scheme: "http"
+
+# TCP Configuration (for future database access, etc.)
 tcp:
   routers: {}
   services: {}
 
+# UDP Configuration (for future real-time features)
 udp:
   routers: {}
   services: {}
+
+# TLS Configuration
+tls:
+  options:
+    default:
+      minVersion: "VersionTLS12"
+      maxVersion: "VersionTLS13"
+      sslStrategies:
+        - "tls.SniStrict"
+      cipherSuites:
+        - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+        - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+        - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+      curvePreferences:
+        - "CurveP521"
+        - "CurveP384"
+        - "CurveP256"
+
+  # Certificates (for development with self-signed certificates)
+  # certificates:
+  #   - certFile: /etc/certs/tls.crt
+  #     keyFile: /etc/certs/tls.key

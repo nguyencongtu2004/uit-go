@@ -12,8 +12,15 @@ services:
       MONGO_INITDB_DATABASE: uitgo_users
     volumes:
       - mongodb_users_data:/data/db
+      - ./scripts/mongodb/init-users.js:/docker-entrypoint-initdb.d/init-users.js:ro
     networks:
       - uit-go-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   mongodb-drivers:
     image: mongo:7.0
@@ -27,8 +34,15 @@ services:
       MONGO_INITDB_DATABASE: uitgo_drivers
     volumes:
       - mongodb_drivers_data:/data/db
+      - ./scripts/mongodb/init-drivers.js:/docker-entrypoint-initdb.d/init-drivers.js:ro
     networks:
       - uit-go-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   mongodb-trips:
     image: mongo:7.0
@@ -42,8 +56,15 @@ services:
       MONGO_INITDB_DATABASE: uitgo_trips
     volumes:
       - mongodb_trips_data:/data/db
+      - ./scripts/mongodb/init-trips.js:/docker-entrypoint-initdb.d/init-trips.js:ro
     networks:
       - uit-go-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Caching Service
   redis:
@@ -51,50 +72,75 @@ services:
     container_name: uit-go-redis
     restart: unless-stopped
     ports:
-      - "6379:6379" # default Redis port
-    command: redis-server --appendonly yes --requirepass redis123
+      - "6379:6379"
     volumes:
       - redis_data:/data
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
     networks:
       - uit-go-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis123", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
-  # Message Broker Services - Kafka in KRaft mode (không cần Zookeeper)
+  # Message Broker Services - Kafka in KRaft mode
   kafka:
-    image: confluentinc/cp-kafka:8.0.0   # Kafka >= 2.8 (hỗ trợ KRaft)
+    image: confluentinc/cp-kafka:8.0.0 # Kafka >= 2.8 (hỗ trợ KRaft)
     container_name: kafka
     ports:
-      - "9092:9092"   # client access
-      - "9093:9093"   # inter-broker communication
+      - "9092:9092" # client access
+      - "9093:9093" # inter-broker communication
     environment:
-      # KRaft mode config
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_NODE_ID: 1
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LOG_DIRS: /var/lib/kafka/data
-      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk  # random unique ID (chạy `kafka-storage.sh random-uuid`)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_RETENTION_MS: 86400000
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
     volumes:
       - kafka_data:/var/lib/kafka/data
     networks:
       - uit-go-network
+    healthcheck:
+      test: kafka-topics --bootstrap-server localhost:9092 --list
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Application Services
   user-service:
-    build: ./services/user-service
+    build:
+      context: .
+      dockerfile: services/user-service/Dockerfile
     container_name: uit-go-user-service
     restart: unless-stopped
     volumes:
-      - ./services/user-service:/app
+      - ./services/user-service/src:/app/src
+      - ./common:/app/common
       - /app/node_modules
+      - /app/common/node_modules
+      - user_service_logs:/app/logs
     env_file:
       - ./env/user-service.env
     depends_on:
-      - mongodb-users
-      - kafka
-      - redis
+      mongodb-users:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - uit-go-network
     labels:
@@ -103,20 +149,33 @@ services:
       - "traefik.http.routers.user-service.entrypoints=web"
       - "traefik.http.services.user-service.loadbalancer.server.port=3000"
       - "traefik.docker.network=uit-go_uit-go-network"
+      - "traefik.http.routers.user-service.middlewares=user-service-ratelimit"
+      - "traefik.http.middlewares.user-service-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.user-service-ratelimit.ratelimit.burst=50"
 
   driver-service:
-    build: ./services/driver-service
+    build:
+      context: .
+      dockerfile: services/driver-service/Dockerfile
     container_name: uit-go-driver-service
     restart: unless-stopped
     volumes:
-      - ./services/driver-service:/app
+      - ./services/driver-service/src:/app/src
+      - ./common:/app/common
       - /app/node_modules
+      - /app/common/node_modules
+      - driver_service_logs:/app/logs
+    ports:
+      - "3001:3001"
     env_file:
       - ./env/driver-service.env
     depends_on:
-      - mongodb-drivers
-      - kafka
-      - redis
+      mongodb-drivers:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - uit-go-network
     labels:
@@ -125,20 +184,33 @@ services:
       - "traefik.http.routers.driver-service.entrypoints=web"
       - "traefik.http.services.driver-service.loadbalancer.server.port=3000"
       - "traefik.docker.network=uit-go_uit-go-network"
+      - "traefik.http.routers.driver-service.middlewares=driver-service-ratelimit"
+      - "traefik.http.middlewares.driver-service-ratelimit.ratelimit.average=1000"
+      - "traefik.http.middlewares.driver-service-ratelimit.ratelimit.burst=500"
 
   trip-service:
-    build: ./services/trip-service
+    build:
+      context: .
+      dockerfile: services/trip-service/Dockerfile
     container_name: uit-go-trip-service
     restart: unless-stopped
     volumes:
-      - ./services/trip-service:/app
+      - ./services/trip-service/src:/app/src
+      - ./common:/app/common
       - /app/node_modules
+      - /app/common/node_modules
+      - trip_service_logs:/app/logs
+    ports:
+      - "3002:3002"
     env_file:
       - ./env/trip-service.env
     depends_on:
-      - mongodb-trips
-      - kafka
-      - redis
+      mongodb-trips:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - uit-go-network
     labels:
@@ -147,6 +219,9 @@ services:
       - "traefik.http.routers.trip-service.entrypoints=web"
       - "traefik.http.services.trip-service.loadbalancer.server.port=3000"
       - "traefik.docker.network=uit-go_uit-go-network"
+      - "traefik.http.routers.trip-service.middlewares=trip-service-ratelimit"
+      - "traefik.http.middlewares.trip-service-ratelimit.ratelimit.average=200"
+      - "traefik.http.middlewares.trip-service-ratelimit.ratelimit.burst=100"
 
   # Traefik Reverse Proxy & Load Balancer
   traefik:
@@ -180,9 +255,12 @@ volumes:
   mongodb_users_data:
   mongodb_drivers_data:
   mongodb_trips_data:
-  traefik_data:
-  kafka_data:
   redis_data:
+  kafka_data:
+  traefik_data:
+  user_service_logs:
+  driver_service_logs:
+  trip_service_logs:
 
 networks:
   uit-go-network:

@@ -1,0 +1,176 @@
+#!/bin/sh
+# Pre-push hook for UIT-Go project
+# This hook runs before pushing to ensure code quality and prevent issues
+
+echo "🚀 Running pre-push checks..."
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Flag to track if any checks fail
+CHECKS_FAILED=0
+
+# Function to print status
+print_status() {
+    if [ $1 -eq 0 ]; then
+        echo "${GREEN}✅ $2${NC}"
+    else
+        echo "${RED}❌ $2${NC}"
+        CHECKS_FAILED=1
+    fi
+}
+
+# Get the remote repository and branch being pushed to
+remote="$1"
+url="$2"
+
+# Read stdin to get the list of refs being pushed
+while read local_ref local_sha remote_ref remote_sha
+do
+    if [ "$local_sha" = "0000000000000000000000000000000000000000" ]; then
+        # Handle delete - skip checks for branch deletion
+        continue
+    fi
+    
+    echo "${YELLOW}📋 Checking branch: $local_ref${NC}"
+    
+    # Check if this is the main/master branch
+    if [[ "$remote_ref" =~ refs/heads/(main|master) ]]; then
+        echo "${YELLOW}⚠️ Pushing to protected branch: $(basename "$remote_ref")${NC}"
+        
+        # Run comprehensive tests for main branch
+        echo "${YELLOW}🧪 Running comprehensive tests...${NC}"
+        
+        # Check if we have test scripts
+        if [ -f "package.json" ]; then
+            if npm run test --if-present > /dev/null 2>&1; then
+                print_status 0 "Tests passed"
+            else
+                print_status 1 "Tests failed"
+                echo "${RED}Cannot push to main branch with failing tests${NC}"
+            fi
+        fi
+        
+        # Check for proper commit messages on main branch
+        echo "${YELLOW}📝 Checking commit message format...${NC}"
+        COMMIT_MESSAGES=$(git log --format=%s $remote_sha..$local_sha)
+        INVALID_COMMITS=""
+        
+        while IFS= read -r commit_msg; do
+            # Check if commit message follows conventional commit format
+            if ! echo "$commit_msg" | grep -qE '^(feat|fix|docs|style|refactor|test|chore)(\(.+\))?: .+'; then
+                INVALID_COMMITS="$INVALID_COMMITS\n  - $commit_msg"
+            fi
+        done <<< "$COMMIT_MESSAGES"
+        
+        if [ -n "$INVALID_COMMITS" ]; then
+            echo "${RED}❌ Found commits with non-standard messages:${NC}"
+            echo -e "$INVALID_COMMITS"
+            echo "${YELLOW}💡 Use conventional commit format: type(scope): description${NC}"
+            echo "${YELLOW}   Examples: feat: add user authentication${NC}"
+            echo "${YELLOW}            fix(api): resolve login endpoint issue${NC}"
+            CHECKS_FAILED=1
+        else
+            print_status 0 "Commit message format"
+        fi
+    fi
+    
+    # Check for merge commits (should be avoided in feature branches)
+    echo "${YELLOW}🔀 Checking for merge commits...${NC}"
+    MERGE_COMMITS=$(git rev-list --merges $remote_sha..$local_sha | wc -l | tr -d ' ')
+    if [ "$MERGE_COMMITS" -gt 0 ]; then
+        echo "${YELLOW}⚠️ Found $MERGE_COMMITS merge commits${NC}"
+        if [[ ! "$remote_ref" =~ refs/heads/(main|master|develop) ]]; then
+            echo "${YELLOW}💡 Consider rebasing feature branches instead of merging${NC}"
+        fi
+    else
+        print_status 0 "No merge commits in feature branch"
+    fi
+    
+    # Check for large commits
+    echo "${YELLOW}📏 Checking commit sizes...${NC}"
+    LARGE_COMMITS=""
+    while IFS= read -r commit; do
+        COMMIT_SHA=$(echo "$commit" | cut -d' ' -f1)
+        CHANGES=$(git show --stat=1000 --format="" "$COMMIT_SHA" | tail -1 | grep -o '[0-9]\+ insertion' | cut -d' ' -f1)
+        if [ -n "$CHANGES" ] && [ "$CHANGES" -gt 500 ]; then
+            LARGE_COMMITS="$LARGE_COMMITS\n  - $COMMIT_SHA: $CHANGES insertions"
+        fi
+    done <<< "$(git rev-list $remote_sha..$local_sha)"
+    
+    if [ -n "$LARGE_COMMITS" ]; then
+        echo "${YELLOW}⚠️ Found large commits:${NC}"
+        echo -e "$LARGE_COMMITS"
+        echo "${YELLOW}💡 Consider breaking down large commits into smaller ones${NC}"
+    else
+        print_status 0 "Commit sizes are reasonable"
+    fi
+    
+    # Check for environment files in the push
+    echo "${YELLOW}🔐 Checking for environment files...${NC}"
+    ENV_FILES=$(git diff --name-only $remote_sha..$local_sha | grep -E '\.(env)$' | grep -v '\.env\.template$')
+    if [ -n "$ENV_FILES" ]; then
+        echo "${RED}❌ Environment files found in push:${NC}"
+        echo "$ENV_FILES"
+        echo "${RED}Environment files should not be committed${NC}"
+        CHECKS_FAILED=1
+    else
+        print_status 0 "No environment files in push"
+    fi
+    
+    # Check for hardcoded secrets or passwords
+    echo "${YELLOW}🔍 Scanning for potential secrets...${NC}"
+    POTENTIAL_SECRETS=$(git diff $remote_sha..$local_sha | grep -E '^\+.*' | grep -iE '(password|secret|key|token|api_key).*=.*[a-zA-Z0-9]{8,}')
+    if [ -n "$POTENTIAL_SECRETS" ]; then
+        echo "${RED}❌ Potential secrets found:${NC}"
+        echo "$POTENTIAL_SECRETS" | head -3
+        echo "${RED}Please remove hardcoded secrets before pushing${NC}"
+        CHECKS_FAILED=1
+    else
+        print_status 0 "No potential secrets detected"
+    fi
+    
+    # Validate Docker-related files
+    echo "${YELLOW}🐳 Validating Docker changes...${NC}"
+    DOCKER_CHANGES=$(git diff --name-only $remote_sha..$local_sha | grep -E '^(Dockerfile|docker-compose\.ya?ml|\.dockerignore)$')
+    if [ -n "$DOCKER_CHANGES" ]; then
+        # Check if docker-compose still works
+        if echo "$DOCKER_CHANGES" | grep -q "docker-compose" && command -v docker-compose > /dev/null 2>&1; then
+            docker-compose config > /dev/null 2>&1
+            print_status $? "Docker Compose configuration"
+        fi
+        
+        # Check for exposed ports or volumes that might be security issues
+        SECURITY_ISSUES=$(git diff $remote_sha..$local_sha -- $DOCKER_CHANGES | grep -E '^\+.*' | grep -iE '(expose|ports).*:(22|3389|5432|3306|6379|27017)' | grep -v "# UIT-Go")
+        if [ -n "$SECURITY_ISSUES" ]; then
+            echo "${YELLOW}⚠️ Potential security issues in Docker configuration:${NC}"
+            echo "$SECURITY_ISSUES"
+            echo "${YELLOW}💡 Ensure exposed ports are intentional and secure${NC}"
+        fi
+    fi
+done
+
+# Check if there are uncommitted changes
+echo "${YELLOW}📋 Checking for uncommitted changes...${NC}"
+if ! git diff-index --quiet HEAD --; then
+    echo "${YELLOW}⚠️ You have uncommitted changes${NC}"
+    echo "${YELLOW}💡 Consider committing all changes before pushing${NC}"
+    git status --porcelain | head -5
+else
+    print_status 0 "No uncommitted changes"
+fi
+
+# Final status
+echo ""
+if [ $CHECKS_FAILED -eq 0 ]; then
+    echo "${GREEN}✅ All pre-push checks passed!${NC}"
+    echo "🚀 Safe to push"
+    exit 0
+else
+    echo "${RED}❌ Some pre-push checks failed!${NC}"
+    echo "💡 Please fix the issues above before pushing"
+    exit 1
+fi

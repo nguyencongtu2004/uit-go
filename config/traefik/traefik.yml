@@ -1,5 +1,5 @@
 # Traefik Configuration for UIT-Go Microservices
-# Main configuration file for Traefik proxy
+# Main configuration file for Traefik v3 reverse proxy
 
 # Global Configuration
 global:
@@ -16,8 +16,20 @@ api:
 entryPoints:
   web:
     address: ":80"
+    # HTTP redirect to HTTPS in production
+    # http:
+    #   redirections:
+    #     entrypoint:
+    #       to: websecure
+    #       scheme: https
+
   websecure:
     address: ":443"
+    # HTTP/2 and HTTP/3 support
+    http2:
+      maxConcurrentStreams: 250
+    http3: {}
+
   traefik:
     address: ":8080"
 
@@ -29,8 +41,9 @@ providers:
     exposedByDefault: false
     network: "uit-go_uit-go-network" # Use the actual Docker Compose network name
     watch: true
+    defaultRule: "Host(`{{ normalize .Name }}.localhost`)"
 
-  # File provider for static configuration
+  # File provider for static configuration and middleware
   file:
     filename: /etc/traefik/dynamic.yml
     watch: true
@@ -43,22 +56,53 @@ certificatesResolvers:
       storage: /etc/traefik/acme.json
       httpChallenge:
         entryPoint: web
+      # Alternative: DNS challenge for wildcard certificates
+      # dnsChallenge:
+      #   provider: cloudflare
+      #   delayBeforeCheck: 0
 
 # Logging Configuration
 log:
   level: INFO
   format: json
+  filePath: "/var/log/traefik/traefik.log"
 
 # Access Logs
 accessLog:
   format: json
+  filePath: "/var/log/traefik/access.log"
+  bufferingSize: 0
+  filters:
+    statusCodes:
+      - "200"
+      - "300-302"
+      - "400-499"
+      - "500-599"
+    retryAttempts: true
+    minDuration: "10ms"
+  fields:
+    defaultMode: keep
+    names:
+      ClientUsername: drop
+    headers:
+      defaultMode: keep
+      names:
+        User-Agent: redact
+        Authorization: drop
+        Content-Type: keep
 
 # Metrics Configuration
 metrics:
   prometheus:
     addEntryPointsLabels: true
     addServicesLabels: true
+    addRoutersLabels: true
+    buckets:
+      - 0.1
+      - 0.3
+      - 1.2
+      - 5.0
 
-# Ping Configuration
+# Health Check Configuration
 ping:
   entryPoint: traefik
