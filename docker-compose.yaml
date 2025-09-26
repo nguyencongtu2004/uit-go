@@ -12,7 +12,6 @@ services:
       MONGO_INITDB_DATABASE: uitgo_users
     volumes:
       - mongodb_users_data:/data/db
-      - ./scripts/mongodb/init-users.js:/docker-entrypoint-initdb.d/init-users.js:ro
     networks:
       - uit-go-network
     healthcheck:
@@ -34,7 +33,6 @@ services:
       MONGO_INITDB_DATABASE: uitgo_drivers
     volumes:
       - mongodb_drivers_data:/data/db
-      - ./scripts/mongodb/init-drivers.js:/docker-entrypoint-initdb.d/init-drivers.js:ro
     networks:
       - uit-go-network
     healthcheck:
@@ -56,7 +54,6 @@ services:
       MONGO_INITDB_DATABASE: uitgo_trips
     volumes:
       - mongodb_trips_data:/data/db
-      - ./scripts/mongodb/init-trips.js:/docker-entrypoint-initdb.d/init-trips.js:ro
     networks:
       - uit-go-network
     healthcheck:
@@ -132,6 +129,8 @@ services:
       - /app/node_modules
       - /app/common/node_modules
       - user_service_logs:/app/logs
+    ports:
+      - 3000:3000
     env_file:
       - ./env/user-service.env
     depends_on:

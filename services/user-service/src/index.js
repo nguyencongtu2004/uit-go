@@ -72,39 +72,13 @@ app.get('/health', async (req, res) => {
     res.json(healthCheck);
 });
 
-// TODO: Add routes
-// Temporary test route for users with MongoDB
-app.get('/api/users', async (req, res) => {
-    try {
-        const users = await User.find().select('-passwordHash').limit(10);
-        res.json({
-            message: 'User Service - Users endpoint',
-            service: 'user-service',
-            database: 'uitgo_users',
-            count: users.length,
-            users: users
-        });
-    } catch (error) {
-        console.error('Error fetching users:', error);
-        res.status(500).json({
-            error: 'Database error',
-            message: 'Failed to fetch users'
-        });
-    }
-});
+// Routes
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
 
-app.get('/api/auth', (req, res) => {
-    res.json({
-        message: 'User Service - Auth endpoint',
-        service: 'user-service',
-        database: 'uitgo_users',
-        endpoints: ['login', 'register', 'refresh']
-    });
-});
-// const authRoutes = require('./routes/auth');
-// const userRoutes = require('./routes/users');
-// app.use('/api/auth', authRoutes);
-// app.use('/api/users', userRoutes);
+// Apply routes
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
