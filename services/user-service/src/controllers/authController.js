@@ -300,6 +300,83 @@ const getProfile = async (req, res) => {
 };
 
 /**
+ * Verify token for service-to-service communication
+ * POST /api/auth/verify-service
+ */
+const verifyTokenService = async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                error: 'Token required',
+                message: 'Token is required in request body'
+            });
+        }
+
+        const jwt = require('jsonwebtoken');
+        const JWT_SECRET = process.env.JWT_SECRET || 'uitgo-secret-key-change-in-production';
+
+        // Verify token
+        const decoded = jwt.verify(token, JWT_SECRET);
+
+        // Find user to ensure they still exist and are active
+        const user = await User.findById(decoded.userId).select('-passwordHash');
+
+        if (!user || !user.isActive) {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid token',
+                message: 'User not found or inactive'
+            });
+        }
+
+        // Return user info for other services
+        res.json({
+            success: true,
+            message: 'Token is valid',
+            data: {
+                valid: true,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    fullName: user.fullName,
+                    role: user.role,
+                    isOnline: user.isOnline,
+                    isActive: user.isActive
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Service token verification error:', error);
+
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({
+                success: false,
+                error: 'Token expired',
+                message: 'Token has expired'
+            });
+        }
+
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid token',
+                message: 'Token is malformed'
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            error: 'Token verification failed',
+            message: 'Internal server error'
+        });
+    }
+};
+
+/**
  * Verify token (middleware endpoint)
  * GET /api/auth/verify
  */
@@ -406,5 +483,6 @@ module.exports = {
     logout,
     getProfile,
     verifyToken,
+    verifyTokenService,
     changePassword
 };

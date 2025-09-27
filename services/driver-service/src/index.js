@@ -5,6 +5,9 @@ require('dotenv').config();
 const dbConnection = require('./config/database');
 const Driver = require('./models/Driver');
 
+// Authentication middleware
+const { authenticateServiceToken, optionalAuth } = require('../common/shared/authMiddleware');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -64,34 +67,62 @@ app.get('/health', async (req, res) => {
 });
 
 // TODO: Add routes
-// Temporary test routes with MongoDB
-app.get('/drivers', async (req, res) => {
-    try {
-        const drivers = await Driver.find().limit(10);
+// Protected routes with authentication
+app.get('/drivers',
+    authenticateServiceToken,
+    async (req, res) => {
+        try {
+            const drivers = await Driver.find().limit(10);
+            res.json({
+                message: 'Driver Service - Drivers endpoint',
+                service: 'driver-service',
+                database: 'uitgo_drivers',
+                user: req.user,
+                count: drivers.length,
+                drivers: drivers
+            });
+        } catch (error) {
+            console.error('Error fetching drivers:', error);
+            res.status(500).json({
+                error: 'Database error',
+                message: 'Failed to fetch drivers'
+            });
+        }
+    }
+);
+
+app.get('/location',
+    authenticateServiceToken,
+    (req, res) => {
         res.json({
-            message: 'Driver Service - Drivers endpoint',
+            message: 'Driver Service - Location endpoint',
             service: 'driver-service',
             database: 'uitgo_drivers',
-            count: drivers.length,
-            drivers: drivers
+            user: req.user,
+            endpoints: ['update', 'track', 'nearby']
+        });
+    }
+);
+
+// Public route for testing
+app.get('/drivers/public', async (req, res) => {
+    try {
+        const count = await Driver.countDocuments();
+        res.json({
+            message: 'Driver Service - Public endpoint',
+            service: 'driver-service',
+            database: 'uitgo_drivers',
+            totalDrivers: count
         });
     } catch (error) {
-        console.error('Error fetching drivers:', error);
+        console.error('Error fetching driver count:', error);
         res.status(500).json({
             error: 'Database error',
-            message: 'Failed to fetch drivers'
+            message: 'Failed to fetch driver count'
         });
     }
 });
 
-app.get('/location', (req, res) => {
-    res.json({
-        message: 'Driver Service - Location endpoint',
-        service: 'driver-service',
-        database: 'uitgo_drivers',
-        endpoints: ['update', 'track', 'nearby']
-    });
-});
 // const driverRoutes = require('./routes/drivers');
 // const locationRoutes = require('./routes/location');
 // app.use('/drivers', driverRoutes);

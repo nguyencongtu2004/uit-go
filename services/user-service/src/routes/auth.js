@@ -8,6 +8,7 @@ const {
     logout,
     getProfile,
     verifyToken,
+    verifyTokenService,
     changePassword
 } = require('../controllers/authController');
 
@@ -68,6 +69,14 @@ router.get('/verify',
     authenticateToken,
     verifyToken
 );
+
+/**
+ * @route   POST /api/auth/verify-service
+ * @desc    Verify JWT token for service-to-service communication
+ * @access  Public (Service-to-service)
+ * @body    { token }
+ */
+router.post('/verify-service', verifyTokenService);
 
 /**
  * @route   PUT /api/auth/change-password

@@ -5,6 +5,9 @@ require('dotenv').config();
 const dbConnection = require('./config/database');
 const Trip = require('./models/Trip');
 
+// Authentication middleware
+const { authenticateServiceToken, optionalAuth } = require('../common/shared/authMiddleware');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -81,25 +84,45 @@ app.get('/health', async (req, res) => {
 });
 
 // TODO: Add routes
-// Temporary test routes
-app.get('/trips', (req, res) => {
+// Protected routes with authentication
+app.get('/trips',
+    authenticateServiceToken,
+    (req, res) => {
+        res.json({
+            message: 'Trip Service - Trips endpoint',
+            service: 'trip-service',
+            user: req.user,
+            trips: [
+                { id: 1, passenger: 'User 1', driver: 'Driver 1', status: 'completed' },
+                { id: 2, passenger: 'User 2', driver: 'Driver 2', status: 'ongoing' }
+            ]
+        });
+    }
+);
+
+app.get('/booking',
+    authenticateServiceToken,
+    (req, res) => {
+        res.json({
+            message: 'Trip Service - Booking endpoint',
+            service: 'trip-service',
+            user: req.user,
+            endpoints: ['create', 'cancel', 'status']
+        });
+    }
+);
+
+// Public route for testing
+app.get('/trips/public', (req, res) => {
     res.json({
-        message: 'Trip Service - Trips endpoint',
+        message: 'Trip Service - Public endpoint',
         service: 'trip-service',
         trips: [
-            { id: 1, passenger: 'User 1', driver: 'Driver 1', status: 'completed' },
-            { id: 2, passenger: 'User 2', driver: 'Driver 2', status: 'ongoing' }
+            { id: 1, passenger: 'Anonymous', driver: 'Anonymous', status: 'public_view' }
         ]
     });
 });
 
-app.get('/booking', (req, res) => {
-    res.json({
-        message: 'Trip Service - Booking endpoint',
-        service: 'trip-service',
-        endpoints: ['create', 'cancel', 'status']
-    });
-});
 // const tripRoutes = require('./routes/trips');
 // const bookingRoutes = require('./routes/booking');
 // app.use('/trips', tripRoutes);
