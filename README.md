@@ -46,14 +46,14 @@ UIT-Go là một nền tảng chia sẻ chuyến đi được xây dựng với 
 
 ### Traefik Routing Configuration
 
-| Route Pattern     | Target Service | Middleware Applied         |
-| ----------------- | -------------- | -------------------------- |
-| `/api/users/*`    | user-service   | CORS, Security, Rate Limit |
-| `/api/auth/*`     | user-service   | CORS, Security, Rate Limit |
-| `/api/drivers/*`  | driver-service | CORS, Security, Rate Limit |
-| `/api/location/*` | driver-service | CORS, Security, Rate Limit |
-| `/api/trips/*`    | trip-service   | CORS, Security, Rate Limit |
-| `/api/booking/*`  | trip-service   | CORS, Security, Rate Limit |
+| Subdomain Pattern  | Target Service | Routes        | Middleware Applied         |
+| ------------------ | -------------- | ------------- | -------------------------- |
+| `user.localhost`   | user-service   | `/auth/*`     | CORS, Security, Rate Limit |
+| `user.localhost`   | user-service   | `/users/*`    | CORS, Security, Rate Limit |
+| `driver.localhost` | driver-service | `/drivers/*`  | CORS, Security, Rate Limit |
+| `driver.localhost` | driver-service | `/location/*` | CORS, Security, Rate Limit |
+| `trip.localhost`   | trip-service   | `/trips/*`    | CORS, Security, Rate Limit |
+| `trip.localhost`   | trip-service   | `/booking/*`  | CORS, Security, Rate Limit |
 
 ### Database Architecture
 
@@ -204,21 +204,27 @@ docker compose up --build -d
 ./manage.sh start
 ```
 
-3. **Verify installation**
+### Verify installation
 
 ```bash
 # Check Traefik dashboard
 curl http://localhost:8080/ping
 
-# Check API endpoints via Traefik
-curl http://localhost/api/users
-curl http://localhost/api/drivers
-curl http://localhost/api/trips
+# Check API endpoints via subdomain routing
+curl http://user.localhost/users
+curl http://user.localhost/auth
+curl http://driver.localhost/drivers
+curl http://driver.localhost/location
+curl http://trip.localhost/trips
+curl http://trip.localhost/booking
 ```
 
 ### Access Points
 
-- **Main API**: http://localhost (via Traefik)
+- **Main API**:
+  - User Service: http://user.localhost (via Traefik)
+  - Driver Service: http://driver.localhost (via Traefik)
+  - Trip Service: http://trip.localhost (via Traefik)
 - **Traefik Dashboard**: http://localhost:8080
 - **MongoDB Users**: localhost:27017
 - **MongoDB Drivers**: localhost:27018
@@ -238,9 +244,13 @@ env/
 
 ## 📋 API Documentation
 
-### Access via Traefik (http://localhost)
+### Access via Traefik Subdomain Routing
 
-All API endpoints are now accessible through Traefik reverse proxy at port 80 (HTTP) or 443 (HTTPS in production).
+All API endpoints are now accessible through Traefik reverse proxy using subdomain patterns. Each service has its own subdomain and simplified routing:
+
+- **User Service**: `http://user.localhost` - User management & authentication
+- **Driver Service**: `http://driver.localhost` - Driver management & location services
+- **Trip Service**: `http://trip.localhost` - Trip management & booking services
 
 #### Traefik Dashboard
 
@@ -258,10 +268,12 @@ GET http://localhost:8080/ping
 
 ### User Service
 
+Base URL: `http://user.localhost`
+
 #### Get Users
 
 ```http
-GET http://localhost/api/users
+GET http://user.localhost/users
 ```
 
 **Response:**
@@ -279,7 +291,7 @@ GET http://localhost/api/users
 #### Authentication
 
 ```http
-GET http://localhost/api/auth
+GET http://user.localhost/auth
 ```
 
 **Response:**
@@ -294,10 +306,12 @@ GET http://localhost/api/auth
 
 ### Driver Service
 
+Base URL: `http://driver.localhost`
+
 #### Get Drivers
 
 ```http
-GET /api/drivers
+GET http://driver.localhost/drivers
 ```
 
 **Response:**
@@ -315,7 +329,7 @@ GET /api/drivers
 #### Location Services
 
 ```http
-GET /api/location
+GET http://driver.localhost/location
 ```
 
 **Response:**
@@ -330,10 +344,12 @@ GET /api/location
 
 ### Trip Service
 
+Base URL: `http://trip.localhost`
+
 #### Get Trips
 
 ```http
-GET /api/trips
+GET http://trip.localhost/trips
 ```
 
 **Response:**
@@ -362,7 +378,7 @@ GET /api/trips
 #### Booking Services
 
 ```http
-GET /api/booking
+GET http://trip.localhost/booking
 ```
 
 **Response:**
@@ -379,13 +395,14 @@ GET /api/booking
 
 ### Traefik Management
 
-Project này đã được tích hợp với Traefik reverse proxy thay vì API Gateway truyền thống. Traefik cung cấp:
+Project này đã được tích hợp với Traefik reverse proxy sử dụng subdomain routing pattern thay vì path-based routing truyền thống. Traefik cung cấp:
 
+- **Subdomain Routing**: Mỗi service có subdomain riêng (user.localhost, driver.localhost, trip.localhost)
 - **Automatic Service Discovery**: Tự động phát hiện services qua Docker labels
 - **Load Balancing**: Phân tải tự động cho multiple instances
 - **SSL Termination**: Hỗ trợ HTTPS với Let's Encrypt
 - **Dashboard**: Web UI để monitoring và debugging
-- **Middleware**: Rate limiting, CORS, security headers, compression
+- **Centralized Middleware**: Rate limiting, CORS, security headers, compression tại proxy level
 
 #### Management Scripts
 
@@ -618,10 +635,28 @@ Traefik tự động handle SSL certificates:
 ```yaml
 # Example production service labels
 labels:
-  - "traefik.http.routers.user-service.rule=Host(`api.yourdomain.com`) && PathPrefix(`/api/users`)"
+  - "traefik.http.routers.user-service.rule=Host(`user.yourdomain.com`)"
   - "traefik.http.routers.user-service.entrypoints=websecure"
   - "traefik.http.routers.user-service.tls.certresolver=letsencrypt"
+  - "traefik.http.routers.user-service.middlewares=api-middleware@file"
 ```
+
+### Architecture Benefits
+
+**Subdomain-based Architecture:**
+
+- **Service Isolation**: Mỗi service có subdomain riêng biệt
+- **Simplified Routing**: Không cần `/api` prefix, routes trực tiếp
+- **Better Organization**: Dễ dàng quản lý và phân quyền theo service
+- **Scalability**: Dễ dàng scale từng service độc lập
+- **Security**: Middleware được áp dụng tại proxy level thay vì từng service
+
+**Middleware Centralization:**
+
+- **Performance**: Giảm overhead tại service level
+- **Consistency**: Đồng nhất security policy across services
+- **Maintainability**: Cấu hình tập trung tại Traefik
+- **Flexibility**: Dễ dàng thay đổi middleware rules
 
 ### Infrastructure Services (Current)
 
@@ -654,10 +689,18 @@ curl http://localhost:8080/ping
 # Check service discovery
 curl http://localhost:8080/api/rawdata
 
-# Check API endpoints through Traefik
-curl http://localhost/api/users    # User service status
-curl http://localhost/api/drivers  # Driver service status
-curl http://localhost/api/trips    # Trip service status
+# Check API endpoints through subdomain routing
+curl http://user.localhost/users       # User service status
+curl http://user.localhost/auth        # User auth endpoints
+curl http://driver.localhost/drivers   # Driver service status
+curl http://driver.localhost/location  # Driver location endpoints
+curl http://trip.localhost/trips       # Trip service status
+curl http://trip.localhost/booking     # Trip booking endpoints
+
+# Check health endpoints
+curl http://user.localhost/health
+curl http://driver.localhost/health
+curl http://trip.localhost/health
 
 # Use management script
 .\manage.ps1 health  # Windows
@@ -717,13 +760,18 @@ docker stats
 ### Using cURL
 
 ```bash
-# Test all endpoints via Traefik
-curl http://localhost/api/users
-curl http://localhost/api/drivers
-curl http://localhost/api/trips
-curl http://localhost/api/auth
-curl http://localhost/api/booking
-curl http://localhost/api/location
+# Test all endpoints via subdomain routing
+curl http://user.localhost/users
+curl http://user.localhost/auth
+curl http://driver.localhost/drivers
+curl http://driver.localhost/location
+curl http://trip.localhost/trips
+curl http://trip.localhost/booking
+
+# Test health endpoints
+curl http://user.localhost/health
+curl http://driver.localhost/health
+curl http://trip.localhost/health
 
 # Test Traefik dashboard
 curl http://localhost:8080/ping
@@ -731,7 +779,11 @@ curl http://localhost:8080/ping
 
 ### Using Postman
 
-Import collection với base URL: `http://localhost`
+Import collection với base URLs:
+
+- **User Service**: `http://user.localhost`
+- **Driver Service**: `http://driver.localhost`
+- **Trip Service**: `http://trip.localhost`
 
 ## 🐛 Troubleshooting
 
@@ -777,11 +829,18 @@ docker compose logs traefik | grep "Adding service"
 ```bash
 # Test internal connectivity
 docker exec uit-go-traefik curl http://user-service:3000
+docker exec uit-go-traefik curl http://driver-service:3000
+docker exec uit-go-traefik curl http://trip-service:3000
 
-# Test via Traefik
-curl http://localhost/api/users
-curl http://localhost/api/drivers
-curl http://localhost/api/trips
+# Test via Traefik subdomain routing
+curl http://user.localhost/users
+curl http://driver.localhost/drivers
+curl http://trip.localhost/trips
+
+# Test health endpoints
+curl http://user.localhost/health
+curl http://driver.localhost/health
+curl http://trip.localhost/health
 ```
 
 **Database connectivity issues:**

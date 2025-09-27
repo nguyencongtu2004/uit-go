@@ -1,8 +1,4 @@
 const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const compression = require('compression');
-const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 // Database connection
@@ -12,10 +8,7 @@ const Driver = require('./models/Driver');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(helmet());
-app.use(cors());
-app.use(compression());
+// Basic middleware (security handled by Traefik)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -25,13 +18,6 @@ app.use((req, res, next) => {
     next();
 });
 
-// Rate limiting
-const limiter = rateLimit({
-    windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000,
-    max: process.env.RATE_LIMIT_MAX || 100
-});
-app.use(limiter);
-
 // Basic API info endpoint
 app.get('/', (req, res) => {
     res.json({
@@ -40,9 +26,9 @@ app.get('/', (req, res) => {
         description: 'Driver location and status management service',
         endpoints: {
             health: '/health',
-            drivers: '/api/drivers',
-            location: '/api/location',
-            search: '/api/search'
+            drivers: '/drivers',
+            location: '/location',
+            search: '/search'
         }
     });
 });
@@ -79,7 +65,7 @@ app.get('/health', async (req, res) => {
 
 // TODO: Add routes
 // Temporary test routes with MongoDB
-app.get('/api/drivers', async (req, res) => {
+app.get('/drivers', async (req, res) => {
     try {
         const drivers = await Driver.find().limit(10);
         res.json({
@@ -98,7 +84,7 @@ app.get('/api/drivers', async (req, res) => {
     }
 });
 
-app.get('/api/location', (req, res) => {
+app.get('/location', (req, res) => {
     res.json({
         message: 'Driver Service - Location endpoint',
         service: 'driver-service',
@@ -108,8 +94,8 @@ app.get('/api/location', (req, res) => {
 });
 // const driverRoutes = require('./routes/drivers');
 // const locationRoutes = require('./routes/location');
-// app.use('/api/drivers', driverRoutes);
-// app.use('/api/location', locationRoutes);
+// app.use('/drivers', driverRoutes);
+// app.use('/location', locationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -6,7 +6,6 @@
 const Logger = require('./logger');
 const APIResponse = require('./apiResponse');
 const Validator = require('./validator');
-const DatabaseManager = require('./databaseManager');
 const RedisManager = require('./redisManager');
 const {
     CHANNELS,
@@ -25,9 +24,6 @@ module.exports = {
     Logger,
     APIResponse,
     Validator,
-
-    // Database Management
-    DatabaseManager,
 
     // Redis and Caching
     RedisManager,

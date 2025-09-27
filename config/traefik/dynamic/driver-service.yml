@@ -1,0 +1,23 @@
+http:
+  routers:
+    driver-service-main:
+      rule: "Host(`driver.localhost`)"
+      entrypoints:
+        - web
+      service: driver-service
+      middlewares:
+        - api-middleware@file
+
+    driver-service-health:
+      rule: "Host(`driver.localhost`) && Path(`/health`)"
+      entrypoints:
+        - web
+      service: driver-service
+      middlewares:
+        - security-headers@file
+
+  services:
+    driver-service:
+      loadBalancer:
+        servers:
+          - url: http://driver-service:3000

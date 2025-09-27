@@ -1,14 +1,23 @@
 http:
   routers:
-    trip-service:
-      rule: "PathPrefix(`/api/trips`) || PathPrefix(`/api/booking`)"
+    trip-service-main:
+      rule: "Host(`trip.localhost`)"
       entrypoints:
         - web
       service: trip-service
+      middlewares:
+        - api-middleware@file
+
+    trip-service-health:
+      rule: "Host(`trip.localhost`) && Path(`/health`)"
+      entrypoints:
+        - web
+      service: trip-service
+      middlewares:
+        - security-headers@file
 
   services:
     trip-service:
       loadBalancer:
         servers:
-          - url: http://trip-service:3002
-
+          - url: http://trip-service:3000

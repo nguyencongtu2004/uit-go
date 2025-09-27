@@ -1,78 +1,178 @@
-const { DatabaseManager } = require('../../common/shared');
+const mongoose = require('mongoose');
 
-class TripServiceDatabase extends DatabaseManager {
+class TripServiceDatabase {
     constructor() {
-        super('TripService');
+        this.serviceName = 'TripService';
+        this.connection = null;
+        this.isConnecting = false;
     }
 
     async connect() {
         try {
-            const mongoUri = process.env.DB_URI;
+            if (this.connection && mongoose.connection.readyState === 1) {
+                console.log(`✅ ${this.serviceName} - Already connected to MongoDB`);
+                return this.connection;
+            }
 
+            if (this.isConnecting) {
+                console.log(`⏳ ${this.serviceName} - Connection in progress...`);
+                return new Promise((resolve) => {
+                    const checkConnection = () => {
+                        if (mongoose.connection.readyState === 1) {
+                            resolve(this.connection);
+                        } else {
+                            setTimeout(checkConnection, 100);
+                        }
+                    };
+                    checkConnection();
+                });
+            }
+
+            this.isConnecting = true;
+
+            const mongoUri = process.env.DB_URI;
             if (!mongoUri) {
                 throw new Error('DB_URI environment variable is not set');
             }
 
             console.log(`🔗 ${this.serviceName} connecting to MongoDB...`);
-            console.log(`   URI: ${mongoUri.replace(/\/\/.*@/, '//***:***@')}`); // Hide credentials
+            console.log(`   URI: ${mongoUri.replace(/\/\/.*@/, '//***:***@')}`);
 
-            await super.connect(mongoUri);
+            // Connection options optimized for Docker environment
+            const options = {
+                serverSelectionTimeoutMS: 15000,    // 15 seconds to select server
+                socketTimeoutMS: 45000,              // 45 seconds for socket operations
+                connectTimeoutMS: 15000,             // 15 seconds to establish connection
+                heartbeatFrequencyMS: 10000,         // Heartbeat every 10 seconds
+                maxPoolSize: 10,
+                minPoolSize: 2,
+                maxIdleTimeMS: 30000,
+                retryWrites: true,
+                retryReads: true
+            };
 
-            // Setup service-specific indexes
+            // Connect to MongoDB
+            this.connection = await mongoose.connect(mongoUri, options);
+
+            console.log(`✅ ${this.serviceName} connected to MongoDB successfully!`);
+            console.log(`   Database: ${this.connection.connection.db.databaseName}`);
+            console.log(`   Host: ${this.connection.connection.host}:${this.connection.connection.port}`);
+
+            // Setup basic indexes
             await this.setupIndexes();
 
+            this.isConnecting = false;
             return this.connection;
 
         } catch (error) {
+            this.isConnecting = false;
             console.error(`❌ ${this.serviceName} database connection failed:`, error.message);
             throw error;
         }
     }
 
-    /**
-     * Setup indexes for optimal query performance
-     */
     async setupIndexes() {
         try {
-            console.log(`📋 ${this.serviceName} setting up database indexes...`);
+            console.log(`� ${this.serviceName} - Setting up database indexes...`);
+
+            const db = mongoose.connection.db;
 
             // Trips collection indexes
-            await this.createIndex('trips', { userId: 1 }, { name: 'idx_trips_user_id' });
-            await this.createIndex('trips', { driverId: 1 }, { name: 'idx_trips_driver_id' });
-            await this.createIndex('trips', { status: 1 }, { name: 'idx_trips_status' });
-            await this.createIndex('trips', { createdAt: 1 }, { name: 'idx_trips_created_at' });
-            await this.createIndex('trips', { scheduledTime: 1 }, { sparse: true, name: 'idx_trips_scheduled_time' });
-            await this.createIndex('trips', { userId: 1, status: 1 }, { name: 'idx_trips_user_status_compound' });
-            await this.createIndex('trips', { driverId: 1, status: 1 }, { name: 'idx_trips_driver_status_compound' });
-            await this.createIndex('trips', { 'pickup.location': '2dsphere' }, { name: 'idx_trips_pickup_geo' });
-            await this.createIndex('trips', { 'dropoff.location': '2dsphere' }, { name: 'idx_trips_dropoff_geo' });
+            const tripsCollection = db.collection('trips');
+            const tripIndexes = [
+                { key: { userId: 1 }, options: { name: 'idx_trips_user_id' } },
+                { key: { driverId: 1 }, options: { name: 'idx_trips_driver_id' } },
+                { key: { status: 1 }, options: { name: 'idx_trips_status' } },
+                { key: { createdAt: 1 }, options: { name: 'idx_trips_created_at' } },
+                { key: { scheduledTime: 1 }, options: { sparse: true, name: 'idx_trips_scheduled_time' } },
+                { key: { userId: 1, status: 1 }, options: { name: 'idx_trips_user_status_compound' } },
+                { key: { driverId: 1, status: 1 }, options: { name: 'idx_trips_driver_status_compound' } },
+                { key: { 'pickup.location': '2dsphere' }, options: { name: 'idx_trips_pickup_geo' } },
+                { key: { 'dropoff.location': '2dsphere' }, options: { name: 'idx_trips_dropoff_geo' } }
+            ];
 
             // Trip tracking collection indexes (for real-time updates)
-            await this.createIndex('trip_tracking', { tripId: 1 }, { name: 'idx_tracking_trip_id' });
-            await this.createIndex('trip_tracking', { 'currentLocation': '2dsphere' }, { name: 'idx_tracking_location_geo' });
-            await this.createIndex('trip_tracking', { timestamp: 1 }, { expireAfterSeconds: 2592000, name: 'idx_tracking_ttl' }); // 30 days TTL
-            await this.createIndex('trip_tracking', { tripId: 1, timestamp: -1 }, { name: 'idx_tracking_trip_timestamp_compound' });
+            const tripTrackingCollection = db.collection('trip_tracking');
+            const trackingIndexes = [
+                { key: { tripId: 1 }, options: { name: 'idx_tracking_trip_id' } },
+                { key: { 'currentLocation': '2dsphere' }, options: { name: 'idx_tracking_location_geo' } },
+                { key: { timestamp: 1 }, options: { expireAfterSeconds: 2592000, name: 'idx_tracking_ttl' } }, // 30 days TTL
+                { key: { tripId: 1, timestamp: -1 }, options: { name: 'idx_tracking_trip_timestamp_compound' } }
+            ];
 
             // Trip ratings collection indexes
-            await this.createIndex('trip_ratings', { tripId: 1 }, { unique: true, name: 'idx_ratings_trip_id_unique' });
-            await this.createIndex('trip_ratings', { userId: 1 }, { name: 'idx_ratings_user_id' });
-            await this.createIndex('trip_ratings', { driverId: 1 }, { name: 'idx_ratings_driver_id' });
-            await this.createIndex('trip_ratings', { rating: 1 }, { name: 'idx_ratings_rating' });
-            await this.createIndex('trip_ratings', { createdAt: 1 }, { name: 'idx_ratings_created_at' });
+            const tripRatingsCollection = db.collection('trip_ratings');
+            const ratingIndexes = [
+                { key: { tripId: 1 }, options: { unique: true, name: 'idx_ratings_trip_id_unique' } },
+                { key: { userId: 1 }, options: { name: 'idx_ratings_user_id' } },
+                { key: { driverId: 1 }, options: { name: 'idx_ratings_driver_id' } },
+                { key: { rating: 1 }, options: { name: 'idx_ratings_rating' } },
+                { key: { createdAt: 1 }, options: { name: 'idx_ratings_created_at' } }
+            ];
 
             // Trip payments collection indexes
-            await this.createIndex('trip_payments', { tripId: 1 }, { unique: true, name: 'idx_payments_trip_id_unique' });
-            await this.createIndex('trip_payments', { userId: 1 }, { name: 'idx_payments_user_id' });
-            await this.createIndex('trip_payments', { status: 1 }, { name: 'idx_payments_status' });
-            await this.createIndex('trip_payments', { paymentMethod: 1 }, { name: 'idx_payments_method' });
-            await this.createIndex('trip_payments', { createdAt: 1 }, { name: 'idx_payments_created_at' });
+            const tripPaymentsCollection = db.collection('trip_payments');
+            const paymentIndexes = [
+                { key: { tripId: 1 }, options: { unique: true, name: 'idx_payments_trip_id_unique' } },
+                { key: { userId: 1 }, options: { name: 'idx_payments_user_id' } },
+                { key: { status: 1 }, options: { name: 'idx_payments_status' } },
+                { key: { paymentMethod: 1 }, options: { name: 'idx_payments_method' } },
+                { key: { createdAt: 1 }, options: { name: 'idx_payments_created_at' } }
+            ];
 
-            console.log(`✅ ${this.serviceName} database indexes setup complete`);
+            // Create indexes for each collection
+            const collections = [
+                { collection: tripsCollection, indexes: tripIndexes, name: 'trips' },
+                { collection: tripTrackingCollection, indexes: trackingIndexes, name: 'trip_tracking' },
+                { collection: tripRatingsCollection, indexes: ratingIndexes, name: 'trip_ratings' },
+                { collection: tripPaymentsCollection, indexes: paymentIndexes, name: 'trip_payments' }
+            ];
+
+            for (const { collection, indexes, name } of collections) {
+                for (const index of indexes) {
+                    try {
+                        await collection.createIndex(index.key, index.options);
+                        console.log(`   ✅ Created index: ${index.options.name} on ${name}`);
+                    } catch (error) {
+                        if (error.code === 11000 || error.codeName === 'IndexOptionsConflict') {
+                            console.log(`   ℹ️ Index already exists: ${index.options.name} on ${name}`);
+                        } else {
+                            console.log(`   ⚠️ Failed to create index ${index.options.name} on ${name}: ${error.message}`);
+                        }
+                    }
+                }
+            }
+
+            console.log(`✅ ${this.serviceName} - Database indexes setup completed`);
 
         } catch (error) {
-            console.error(`❌ ${this.serviceName} failed to setup indexes:`, error.message);
-            // Don't throw here - indexes are important but not critical for service startup
+            console.error(`❌ ${this.serviceName} - Failed to setup indexes:`, error.message);
+            // Don't throw - indexes are not critical for service startup
         }
+    }
+
+    async disconnect() {
+        try {
+            if (this.connection) {
+                await mongoose.disconnect();
+                this.connection = null;
+                console.log(`✅ ${this.serviceName} - Disconnected from MongoDB`);
+            }
+        } catch (error) {
+            console.error(`❌ ${this.serviceName} - Disconnect error:`, error.message);
+        }
+    }
+
+    isConnected() {
+        return mongoose.connection.readyState === 1;
+    }
+
+    getConnectionState() {
+        const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+        return {
+            state: states[mongoose.connection.readyState] || 'unknown',
+            readyState: mongoose.connection.readyState
+        };
     }
 
     /**
@@ -82,7 +182,8 @@ class TripServiceDatabase extends DatabaseManager {
         try {
             const locationField = tripType === 'pickup' ? 'pickup.location' : 'dropoff.location';
 
-            const trips = await this.connection.collection('trips').find({
+            const db = mongoose.connection.db;
+            const trips = await db.collection('trips').find({
                 [locationField]: {
                     $near: {
                         $geometry: {
@@ -116,12 +217,14 @@ class TripServiceDatabase extends DatabaseManager {
                 ...metadata
             };
 
+            const db = mongoose.connection.db;
+
             // Insert tracking record
-            await this.connection.collection('trip_tracking').insertOne(trackingData);
+            await db.collection('trip_tracking').insertOne(trackingData);
 
             // Update trip's current status if needed
             if (metadata.status) {
-                await this.connection.collection('trips').updateOne(
+                await db.collection('trips').updateOne(
                     { _id: tripId },
                     {
                         $set: {
@@ -144,7 +247,8 @@ class TripServiceDatabase extends DatabaseManager {
      */
     async getTripStats() {
         try {
-            const stats = await this.connection.collection('trips').aggregate([
+            const db = mongoose.connection.db;
+            const stats = await db.collection('trips').aggregate([
                 {
                     $group: {
                         _id: '$status',
@@ -168,7 +272,8 @@ class TripServiceDatabase extends DatabaseManager {
      */
     async getRevenueStats(startDate, endDate) {
         try {
-            const stats = await this.connection.collection('trip_payments').aggregate([
+            const db = mongoose.connection.db;
+            const stats = await db.collection('trip_payments').aggregate([
                 {
                     $match: {
                         status: 'completed',
@@ -208,7 +313,8 @@ class TripServiceDatabase extends DatabaseManager {
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
-            const result = await this.connection.collection('trip_tracking').deleteMany({
+            const db = mongoose.connection.db;
+            const result = await db.collection('trip_tracking').deleteMany({
                 timestamp: { $lt: cutoffDate }
             });
 
@@ -223,43 +329,89 @@ class TripServiceDatabase extends DatabaseManager {
         }
     }
 
-    /**
-     * Health check specific to trip service
-     */
     async healthCheck() {
         try {
-            const isHealthy = await this.isHealthy();
-            if (!isHealthy) return { status: 'unhealthy', details: 'Database connection failed' };
+            if (!this.isConnected()) {
+                return {
+                    status: 'unhealthy',
+                    message: 'Database not connected',
+                    details: this.getConnectionState()
+                };
+            }
 
-            // Check if we can query trips collection
-            const tripCount = await this.connection.collection('trips').countDocuments();
-            const activeTrips = await this.connection.collection('trips').countDocuments({
+            // Test database operation
+            const result = await mongoose.connection.db.admin().ping();
+
+            if (result.ok !== 1) {
+                return {
+                    status: 'unhealthy',
+                    message: 'Database ping failed',
+                    details: result
+                };
+            }
+
+            // Get basic stats
+            const db = mongoose.connection.db;
+            const tripCount = await db.collection('trips').countDocuments();
+            const activeTrips = await db.collection('trips').countDocuments({
                 status: { $in: ['requested', 'accepted', 'picked_up', 'in_progress'] }
             });
 
             // Check if geospatial indexes exist
-            const indexes = await this.connection.collection('trips').listIndexes().toArray();
+            const indexes = await db.collection('trips').listIndexes().toArray();
             const hasPickupGeoIndex = indexes.some(idx => idx.name === 'idx_trips_pickup_geo');
 
             return {
                 status: 'healthy',
+                message: 'Database connection is healthy',
                 details: {
+                    connectionState: this.getConnectionState(),
                     tripCount,
                     activeTrips,
                     hasPickupGeoIndex,
                     indexCount: indexes.length,
-                    connectionState: this.getHealthStatus()
+                    database: mongoose.connection.db.databaseName,
+                    host: `${mongoose.connection.host}:${mongoose.connection.port}`
                 }
             };
+
         } catch (error) {
             return {
                 status: 'unhealthy',
-                details: `Health check failed: ${error.message}`
+                message: `Health check failed: ${error.message}`,
+                details: this.getConnectionState()
             };
         }
     }
 }
 
 // Export singleton instance
-const tripDatabase = new TripServiceDatabase();
-module.exports = tripDatabase;
+const database = new TripServiceDatabase();
+
+// Handle MongoDB connection events
+mongoose.connection.on('connected', () => {
+    console.log('📡 MongoDB connection established');
+});
+
+mongoose.connection.on('error', (error) => {
+    console.error('❌ MongoDB connection error:', error.message);
+});
+
+mongoose.connection.on('disconnected', () => {
+    console.log('📡 MongoDB disconnected');
+});
+
+// Handle process termination
+process.on('SIGINT', async () => {
+    console.log('⚠️  SIGINT received. Closing MongoDB connection...');
+    await database.disconnect();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    console.log('⚠️  SIGTERM received. Closing MongoDB connection...');
+    await database.disconnect();
+    process.exit(0);
+});
+
+module.exports = database;

@@ -1,14 +1,23 @@
 http:
   routers:
-    user-service:
-      rule: "PathPrefix(`/api/users`) || PathPrefix(`/api/auth`)"
+    user-service-main:
+      rule: "Host(`user.localhost`)"
       entrypoints:
         - web
       service: user-service
+      middlewares:
+        - api-middleware@file
+
+    user-service-health:
+      rule: "Host(`user.localhost`) && Path(`/health`)"
+      entrypoints:
+        - web
+      service: user-service
+      middlewares:
+        - security-headers@file
 
   services:
     user-service:
       loadBalancer:
         servers:
           - url: http://user-service:3000
-
