@@ -129,8 +129,6 @@ services:
       - /app/node_modules
       - /app/common/node_modules
       - user_service_logs:/app/logs
-    ports:
-      - 3000:3000
     env_file:
       - ./env/user-service.env
     depends_on:
@@ -142,15 +140,6 @@ services:
         condition: service_healthy
     networks:
       - uit-go-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.user-service.rule=PathPrefix(`/api/users`) || PathPrefix(`/api/auth`)"
-      - "traefik.http.routers.user-service.entrypoints=web"
-      - "traefik.http.services.user-service.loadbalancer.server.port=3000"
-      - "traefik.docker.network=uit-go_uit-go-network"
-      - "traefik.http.routers.user-service.middlewares=user-service-ratelimit"
-      - "traefik.http.middlewares.user-service-ratelimit.ratelimit.average=100"
-      - "traefik.http.middlewares.user-service-ratelimit.ratelimit.burst=50"
 
   driver-service:
     build:
@@ -164,8 +153,6 @@ services:
       - /app/node_modules
       - /app/common/node_modules
       - driver_service_logs:/app/logs
-    ports:
-      - "3001:3001"
     env_file:
       - ./env/driver-service.env
     depends_on:
@@ -177,15 +164,6 @@ services:
         condition: service_healthy
     networks:
       - uit-go-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.driver-service.rule=PathPrefix(`/api/drivers`) || PathPrefix(`/api/location`)"
-      - "traefik.http.routers.driver-service.entrypoints=web"
-      - "traefik.http.services.driver-service.loadbalancer.server.port=3000"
-      - "traefik.docker.network=uit-go_uit-go-network"
-      - "traefik.http.routers.driver-service.middlewares=driver-service-ratelimit"
-      - "traefik.http.middlewares.driver-service-ratelimit.ratelimit.average=1000"
-      - "traefik.http.middlewares.driver-service-ratelimit.ratelimit.burst=500"
 
   trip-service:
     build:
@@ -199,8 +177,6 @@ services:
       - /app/node_modules
       - /app/common/node_modules
       - trip_service_logs:/app/logs
-    ports:
-      - "3002:3002"
     env_file:
       - ./env/trip-service.env
     depends_on:
@@ -212,15 +188,6 @@ services:
         condition: service_healthy
     networks:
       - uit-go-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.trip-service.rule=PathPrefix(`/api/trips`) || PathPrefix(`/api/booking`)"
-      - "traefik.http.routers.trip-service.entrypoints=web"
-      - "traefik.http.services.trip-service.loadbalancer.server.port=3000"
-      - "traefik.docker.network=uit-go_uit-go-network"
-      - "traefik.http.routers.trip-service.middlewares=trip-service-ratelimit"
-      - "traefik.http.middlewares.trip-service-ratelimit.ratelimit.average=200"
-      - "traefik.http.middlewares.trip-service-ratelimit.ratelimit.burst=100"
 
   # Traefik Reverse Proxy & Load Balancer
   traefik:
@@ -228,27 +195,18 @@ services:
     container_name: uit-go-traefik
     restart: unless-stopped
     ports:
-      - "80:80" # HTTP
-      - "443:443" # HTTPS (for production)
+      - "81:80" # HTTP
+      # - "443:443" # HTTPS (for production)
       - "8080:8080" # Traefik Dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./config/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./config/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
-      - traefik_data:/etc/traefik
+      - ./config/traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./traefik/acme.json:/acme.json
     command:
       - --configfile=/etc/traefik/traefik.yml
-    depends_on:
-      - user-service
-      - driver-service
-      - trip-service
     networks:
       - uit-go-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.localhost`) || PathPrefix(`/traefik`)"
-      - "traefik.http.routers.traefik-dashboard.entrypoints=web"
-      - "traefik.http.services.traefik-dashboard.loadbalancer.server.port=8080"
 
 volumes:
   mongodb_users_data:
@@ -256,7 +214,6 @@ volumes:
   mongodb_trips_data:
   redis_data:
   kafka_data:
-  traefik_data:
   user_service_logs:
   driver_service_logs:
   trip_service_logs:

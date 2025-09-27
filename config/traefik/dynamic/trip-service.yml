@@ -1,0 +1,14 @@
+http:
+  routers:
+    trip-service:
+      rule: "PathPrefix(`/api/trips`) || PathPrefix(`/api/booking`)"
+      entrypoints:
+        - web
+      service: trip-service
+
+  services:
+    trip-service:
+      loadBalancer:
+        servers:
+          - url: http://trip-service:3002
+

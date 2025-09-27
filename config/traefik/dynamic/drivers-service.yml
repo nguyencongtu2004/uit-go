@@ -1,0 +1,14 @@
+http:
+  routers:
+    driver-service:
+      rule: "PathPrefix(`/api/drivers`) || PathPrefix(`/api/location`)"
+      entrypoints:
+        - web
+      service: driver-service
+
+  services:
+    driver-service:
+      loadBalancer:
+        servers:
+          - url: http://driver-service:3001
+

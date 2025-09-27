@@ -1,0 +1,14 @@
+http:
+  routers:
+    user-service:
+      rule: "PathPrefix(`/api/users`) || PathPrefix(`/api/auth`)"
+      entrypoints:
+        - web
+      service: user-service
+
+  services:
+    user-service:
+      loadBalancer:
+        servers:
+          - url: http://user-service:3000
+

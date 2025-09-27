@@ -1,11 +1,6 @@
 # Traefik Configuration for UIT-Go Microservices
 # Main configuration file for Traefik v3 reverse proxy
 
-# Global Configuration
-global:
-  checkNewVersion: false
-  sendAnonymousUsage: false
-
 # API and Dashboard
 api:
   dashboard: true
@@ -45,7 +40,7 @@ providers:
 
   # File provider for static configuration and middleware
   file:
-    filename: /etc/traefik/dynamic.yml
+    directory: /etc/traefik/dynamic
     watch: true
 
 # Certificate Resolvers (for production SSL)
@@ -60,49 +55,3 @@ certificatesResolvers:
       # dnsChallenge:
       #   provider: cloudflare
       #   delayBeforeCheck: 0
-
-# Logging Configuration
-log:
-  level: INFO
-  format: json
-  filePath: "/var/log/traefik/traefik.log"
-
-# Access Logs
-accessLog:
-  format: json
-  filePath: "/var/log/traefik/access.log"
-  bufferingSize: 0
-  filters:
-    statusCodes:
-      - "200"
-      - "300-302"
-      - "400-499"
-      - "500-599"
-    retryAttempts: true
-    minDuration: "10ms"
-  fields:
-    defaultMode: keep
-    names:
-      ClientUsername: drop
-    headers:
-      defaultMode: keep
-      names:
-        User-Agent: redact
-        Authorization: drop
-        Content-Type: keep
-
-# Metrics Configuration
-metrics:
-  prometheus:
-    addEntryPointsLabels: true
-    addServicesLabels: true
-    addRoutersLabels: true
-    buckets:
-      - 0.1
-      - 0.3
-      - 1.2
-      - 5.0
-
-# Health Check Configuration
-ping:
-  entryPoint: traefik

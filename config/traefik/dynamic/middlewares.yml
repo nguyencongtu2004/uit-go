@@ -1,0 +1,54 @@
+# Dynamic Configuration for Traefik
+# This file contains dynamic routing rules and middleware
+
+# HTTP Configuration
+http:
+  # Middlewares
+  middlewares:
+    # Security Headers
+    security-headers:
+      headers:
+        frameDeny: true
+        sslRedirect: false # Set to true in production
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: false # Set to true in production with HTTPS
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+        customResponseHeaders:
+          X-Robots-Tag: "noindex,nofollow,nosnippet,noarchive"
+
+    # CORS middleware for API endpoints
+    api-cors:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        accessControlAllowOriginList:
+          - "*"
+        accessControlAllowHeaders:
+          - "Content-Type"
+          - "Authorization"
+          - "X-Requested-With"
+          - "Accept"
+          - "Origin"
+          - "Cache-Control"
+          - "X-File-Name"
+        accessControlExposeHeaders:
+          - "Content-Length"
+          - "Content-Range"
+          - "X-Total-Count"
+        accessControlAllowCredentials: true
+        accessControlMaxAge: 86400
+
+    # Health check middleware
+    health-check:
+      addPrefix:
+        prefix: "/health"
