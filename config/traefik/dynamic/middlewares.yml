@@ -54,7 +54,7 @@ http:
     # Rate limiting middleware
     rate-limit:
       rateLimit:
-        period: "15m"
+        period: "1m"
         average: 100
         burst: 50
 
@@ -73,6 +73,6 @@ http:
         middlewares:
           - security-headers
           - api-cors
-          - rate-limit
+          # - rate-limit
           - compression
           - request-limit

@@ -1,3 +1,5 @@
+I use Windows OS, so the path uses backslashes. Script files in ps1 format.
+
 # UIT-Go Copilot Instructions
 
 ## Architecture Overview

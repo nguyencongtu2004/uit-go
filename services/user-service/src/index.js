@@ -61,10 +61,17 @@ app.get('/health', async (req, res) => {
 // Routes
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
+const testRoutes = require('./routes/test');
 
 // Apply routes
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
+
+// Test routes (development only)
+if (process.env.NODE_ENV !== 'production') {
+    app.use('/test', testRoutes);
+    console.log('🧪 Test endpoints enabled (development mode)');
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {

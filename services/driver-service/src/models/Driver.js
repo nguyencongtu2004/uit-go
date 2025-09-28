@@ -2,44 +2,21 @@ const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
 const driverSchema = new Schema({
-    // Liên kết với User bên UserService thông qua _id của User
+    // Essential fields only for PoC load testing
     userId: {
-        type: Schema.Types.ObjectId,
-        ref: 'User', // Tham chiếu đến model User nếu cần populate
+        type: String,
         required: true,
         unique: true,
         index: true,
     },
-    licensePlate: {
-        type: String,
-        required: true,
-        unique: true,
-        trim: true,
-        uppercase: true,
-    },
-    vehicleModel: {
-        type: String,
-        required: true,
-        trim: true,
-    },
-    vehicleColor: {
-        type: String,
-        required: false,
-        trim: true,
-    },
-    // Trạng thái hoạt động của tài xế
+    // Trạng thái hoạt động của tài xế - core for load testing
     status: {
         type: String,
         enum: ['OFFLINE', 'ONLINE', 'IN_TRIP'],
         default: 'OFFLINE',
         index: true,
     },
-    isApproved: {
-        type: Boolean,
-        default: false,
-        comment: 'Tài khoản đã được xét duyệt hay chưa',
-    },
-    // Lưu trữ vị trí để truy vấn geospatial
+    // Vị trí để truy vấn geospatial - core for performance testing
     location: {
         type: {
             type: String,
@@ -51,27 +28,25 @@ const driverSchema = new Schema({
             default: [0, 0],
         },
     },
-    // Thông tin bổ sung
-    rating: {
-        type: Number,
-        min: 0,
-        max: 5,
-        default: 0,
+    // Simplified approval status
+    isApproved: {
+        type: Boolean,
+        default: true, // Auto-approve for PoC testing
     },
-    totalTrips: {
-        type: Number,
-        default: 0,
+    // Basic vehicle info - minimal for testing
+    vehicleInfo: {
+        type: String,
+        default: 'Test Vehicle',
     },
 }, {
     timestamps: true,
 });
 
-// Tạo một chỉ mục 2dsphere trên trường location để tối ưu truy vấn vị trí
+// Tạo index tối ưu cho load testing
 driverSchema.index({ location: '2dsphere' });
 driverSchema.index({ status: 1, isApproved: 1 });
-driverSchema.index({ userId: 1 });
 
-// Instance methods
+// Simplified instance methods for PoC
 driverSchema.methods.updateLocation = function (longitude, latitude) {
     this.location = {
         type: 'Point',
@@ -80,25 +55,12 @@ driverSchema.methods.updateLocation = function (longitude, latitude) {
     return this.save();
 };
 
-driverSchema.methods.goOnline = function () {
-    if (this.isApproved) {
-        this.status = 'ONLINE';
-        return this.save();
-    }
-    throw new Error('Driver must be approved to go online');
-};
-
-driverSchema.methods.goOffline = function () {
-    this.status = 'OFFLINE';
+driverSchema.methods.setStatus = function (newStatus) {
+    this.status = newStatus;
     return this.save();
 };
 
-driverSchema.methods.startTrip = function () {
-    this.status = 'IN_TRIP';
-    return this.save();
-};
-
-// Static methods
+// Optimized static methods for geospatial queries
 driverSchema.statics.findNearby = function (longitude, latitude, maxDistanceMeters = 5000) {
     return this.find({
         status: 'ONLINE',
@@ -112,14 +74,7 @@ driverSchema.statics.findNearby = function (longitude, latitude, maxDistanceMete
                 $maxDistance: maxDistanceMeters,
             },
         },
-    });
-};
-
-driverSchema.statics.findOnlineDrivers = function () {
-    return this.find({
-        status: 'ONLINE',
-        isApproved: true
-    });
+    }).limit(50); // Limit for performance
 };
 
 driverSchema.statics.findByUserId = function (userId) {

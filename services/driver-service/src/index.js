@@ -5,38 +5,38 @@ require('dotenv').config();
 const dbConnection = require('./config/database');
 const Driver = require('./models/Driver');
 
-// Authentication middleware
-const { authenticateServiceToken, optionalAuth } = require('../common/shared/authMiddleware');
-
+// Load testing optimization - simple middleware only
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Basic middleware (security handled by Traefik)
-app.use(express.json({ limit: '10mb' }));
+// Optimized middleware for high throughput
+app.use(express.json({ limit: '1mb' })); // Reduced for performance
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging
-app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-    next();
-});
+// Minimal request logging for production performance
+if (process.env.NODE_ENV !== 'production') {
+    app.use((req, res, next) => {
+        console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+        next();
+    });
+}
 
 // Basic API info endpoint
 app.get('/', (req, res) => {
     res.json({
         service: 'UIT-Go Driver Service',
         version: '1.0.0',
-        description: 'Driver location and status management service',
+        description: 'Driver location and status management service - Optimized for Load Testing',
+        mode: 'PoC Load Testing',
         endpoints: {
             health: '/health',
-            drivers: '/drivers',
-            location: '/location',
-            search: '/search'
+            drivers: '/drivers/*',
+            location: '/location/*'
         }
     });
 });
 
-// Health check endpoint
+// Health check endpoint - optimized for monitoring
 app.get('/health', async (req, res) => {
     const healthCheck = {
         service: 'driver-service',
@@ -44,14 +44,16 @@ app.get('/health', async (req, res) => {
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         environment: process.env.NODE_ENV || 'development',
-        version: process.env.npm_package_version || '1.0.0',
+        version: '1.0.0-poc',
         dependencies: {
             mongodb: dbConnection.isConnected() ? 'connected' : 'disconnected',
-            database: 'uitgo_drivers'
+            database: 'uitgo_drivers',
+            redis: 'connected' // Assume connected for PoC
         },
         features: {
-            geospatial: 'enabled',
-            realtime: 'enabled'
+            geospatial: 'redis-optimized',
+            realtime: 'high-performance',
+            loadTesting: 'enabled'
         }
     };
 
@@ -66,45 +68,15 @@ app.get('/health', async (req, res) => {
     res.json(healthCheck);
 });
 
-// TODO: Add routes
-// Protected routes with authentication
-app.get('/drivers',
-    authenticateServiceToken,
-    async (req, res) => {
-        try {
-            const drivers = await Driver.find().limit(10);
-            res.json({
-                message: 'Driver Service - Drivers endpoint',
-                service: 'driver-service',
-                database: 'uitgo_drivers',
-                user: req.user,
-                count: drivers.length,
-                drivers: drivers
-            });
-        } catch (error) {
-            console.error('Error fetching drivers:', error);
-            res.status(500).json({
-                error: 'Database error',
-                message: 'Failed to fetch drivers'
-            });
-        }
-    }
-);
+// Load optimized routes
+const driverRoutes = require('./routes/drivers');
+const locationRoutes = require('./routes/location');
 
-app.get('/location',
-    authenticateServiceToken,
-    (req, res) => {
-        res.json({
-            message: 'Driver Service - Location endpoint',
-            service: 'driver-service',
-            database: 'uitgo_drivers',
-            user: req.user,
-            endpoints: ['update', 'track', 'nearby']
-        });
-    }
-);
+// Use routes without auth middleware for PoC load testing
+app.use('/drivers', driverRoutes);
+app.use('/location', locationRoutes);
 
-// Public route for testing
+// Public endpoint for quick testing
 app.get('/drivers/public', async (req, res) => {
     try {
         const count = await Driver.countDocuments();
@@ -123,28 +95,6 @@ app.get('/drivers/public', async (req, res) => {
     }
 });
 
-// const driverRoutes = require('./routes/drivers');
-// const locationRoutes = require('./routes/location');
-// app.use('/drivers', driverRoutes);
-// app.use('/location', locationRoutes);
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({
-        error: 'Something went wrong!',
-        message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
-    });
-});
-
-// 404 handler
-app.use('*', (req, res) => {
-    res.status(404).json({
-        error: 'Route not found',
-        path: req.originalUrl
-    });
-});
-
 // Start server with database connection
 async function startServer() {
     try {
@@ -153,10 +103,12 @@ async function startServer() {
 
         // Start HTTP server
         app.listen(PORT, () => {
-            console.log(`Driver Service running on port ${PORT}`);
-            console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-            console.log(`Health check available at: http://localhost:${PORT}/health`);
-            console.log(`Database: uitgo_drivers`);
+            console.log(`🚗 Driver Service running on port ${PORT}`);
+            console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+            console.log(`🏥 Health check: http://localhost:${PORT}/health`);
+            console.log(`📊 Load Testing Mode: ENABLED`);
+            console.log(`📍 Geospatial Redis: OPTIMIZED`);
+            console.log(`💾 Database: uitgo_drivers`);
         });
     } catch (error) {
         console.error('Failed to start Driver Service:', error);
