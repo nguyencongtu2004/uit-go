@@ -1,19 +1,37 @@
 const express = require('express');
+const http = require('http');
 require('dotenv').config();
 
 // Database connection
 const dbConnection = require('./config/database');
 const Trip = require('./models/Trip');
 
-// Authentication middleware
-const { authenticateServiceToken, optionalAuth } = require('../common/shared/authMiddleware');
+// Routes
+const tripRoutes = require('./routes/trips');
+const bookingRoutes = require('./routes/booking');
+const driversRoutes = require('./routes/drivers');
+
+// Services
+const { notificationService } = require('./services/notificationService');
+const tripStateService = require('./services/tripStateService');
+const driverMatchingService = require('./services/driverMatchingService');
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
 // Basic middleware (security handled by Traefik)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// CORS configuration
+const cors = require('cors');
+app.use(cors({
+    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
 
 // Request logging
 app.use((req, res, next) => {
@@ -42,6 +60,15 @@ app.get('/health', async (req, res) => {
         // Check MongoDB connection
         const mongoStatus = dbConnection.isConnected() ? 'connected' : 'disconnected';
 
+        // Check Redis connections
+        let redisStatus = 'not_configured';
+        try {
+            await tripStateService.initializeRedis();
+            redisStatus = 'connected';
+        } catch (error) {
+            redisStatus = 'disconnected';
+        }
+
         const healthCheck = {
             service: 'trip-service',
             status: mongoStatus === 'connected' ? 'OK' : 'DEGRADED',
@@ -56,18 +83,18 @@ app.get('/health', async (req, res) => {
             },
             dependencies: {
                 mongodb: mongoStatus,
-                redis: 'not configured',
-                kafka: 'not configured',
-                userService: 'not configured',
-                driverService: 'not configured'
+                redis: redisStatus,
+                userService: process.env.USER_SERVICE_URL || 'http://user-service:3000',
+                driverService: process.env.DRIVER_SERVICE_URL || 'http://driver-service:3000'
             },
-            tripStates: [
-                'searching',
-                'accepted',
-                'ongoing',
-                'completed',
-                'cancelled'
-            ]
+            features: {
+                realTimeNotifications: !!process.env.ENABLE_WEBSOCKET,
+                driverMatching: true,
+                fareCalculation: true,
+                stateManagement: true
+            },
+            tripStates: Object.values(tripStateService.TRIP_STATES),
+            connectedUsers: notificationService.getConnectedUsersCount()
         };
 
         const statusCode = mongoStatus === 'connected' ? 200 : 503;
@@ -83,50 +110,10 @@ app.get('/health', async (req, res) => {
     }
 });
 
-// TODO: Add routes
-// Protected routes with authentication
-app.get('/trips',
-    authenticateServiceToken,
-    (req, res) => {
-        res.json({
-            message: 'Trip Service - Trips endpoint',
-            service: 'trip-service',
-            user: req.user,
-            trips: [
-                { id: 1, passenger: 'User 1', driver: 'Driver 1', status: 'completed' },
-                { id: 2, passenger: 'User 2', driver: 'Driver 2', status: 'ongoing' }
-            ]
-        });
-    }
-);
-
-app.get('/booking',
-    authenticateServiceToken,
-    (req, res) => {
-        res.json({
-            message: 'Trip Service - Booking endpoint',
-            service: 'trip-service',
-            user: req.user,
-            endpoints: ['create', 'cancel', 'status']
-        });
-    }
-);
-
-// Public route for testing
-app.get('/trips/public', (req, res) => {
-    res.json({
-        message: 'Trip Service - Public endpoint',
-        service: 'trip-service',
-        trips: [
-            { id: 1, passenger: 'Anonymous', driver: 'Anonymous', status: 'public_view' }
-        ]
-    });
-});
-
-// const tripRoutes = require('./routes/trips');
-// const bookingRoutes = require('./routes/booking');
-// app.use('/trips', tripRoutes);
-// app.use('/booking', bookingRoutes);
+// Routes
+app.use('/trips', tripRoutes);
+app.use('/booking', bookingRoutes);
+app.use('/drivers', driversRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -153,26 +140,67 @@ async function startServer() {
         await dbConnection.connect();
         console.log('Connected to uitgo_trips database');
 
+        // Initialize services
+        console.log('Initializing services...');
+
+        // Initialize Redis for state management and driver matching
+        await tripStateService.initializeRedis();
+        await driverMatchingService.initializeRedis();
+
+        // Initialize notification service with Redis and WebSocket
+        await notificationService.initializeRedis();
+
+        // Initialize Socket.IO for real-time notifications
+        if (process.env.ENABLE_WEBSOCKET !== 'false') {
+            notificationService.initializeSocketIO(server);
+            console.log('WebSocket server initialized');
+        }
+
+        console.log('All services initialized successfully');
+
         // Start HTTP server
-        const server = app.listen(PORT, () => {
+        const httpServer = server.listen(PORT, () => {
             console.log(`Trip Service running on port ${PORT}`);
             console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
             console.log(`Health check available at: http://localhost:${PORT}/health`);
+            console.log(`WebSocket available at: ws://localhost:${PORT}`);
+
+            // Log available endpoints
+            console.log('\nAvailable endpoints:');
+            console.log('  GET  /health - Health check');
+            console.log('  GET  /trips - Get trip history');
+            console.log('  POST /trips - Create new trip');
+            console.log('  GET  /trips/:id - Get trip details');
+            console.log('  PATCH /trips/:id/accept - Accept trip (driver)');
+            console.log('  PATCH /trips/:id/status - Update trip status');
+            console.log('  DELETE /trips/:id - Cancel trip');
+            console.log('  POST /booking/estimate - Get fare estimate');
+            console.log('  GET  /booking/availability - Check driver availability');
+            console.log('  GET  /booking/active - Get active bookings');
         });
 
         // Graceful shutdown handling
         const gracefulShutdown = async (signal) => {
-            console.log(`Received ${signal}. Starting graceful shutdown...`);
+            console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
 
-            server.close(async () => {
+            httpServer.close(async () => {
                 console.log('HTTP server closed.');
 
                 try {
+                    // Clean up services
+                    await notificationService.cleanup();
+                    await tripStateService.cleanup();
+                    await driverMatchingService.cleanup();
+                    console.log('Services cleaned up.');
+
+                    // Close database connection
                     await dbConnection.disconnect();
                     console.log('Database connection closed.');
+
+                    console.log('Graceful shutdown completed.');
                     process.exit(0);
                 } catch (error) {
-                    console.error('Error during database disconnection:', error);
+                    console.error('Error during graceful shutdown:', error);
                     process.exit(1);
                 }
             });
@@ -187,6 +215,17 @@ async function startServer() {
         // Listen for termination signals
         process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
         process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+        // Handle uncaught exceptions
+        process.on('uncaughtException', (error) => {
+            console.error('Uncaught Exception:', error);
+            gracefulShutdown('UNCAUGHT_EXCEPTION');
+        });
+
+        process.on('unhandledRejection', (reason, promise) => {
+            console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+            gracefulShutdown('UNHANDLED_REJECTION');
+        });
 
     } catch (error) {
         console.error('Failed to start server:', error);

@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const axios = require('axios');
 
 /**
  * Get all users with pagination and filtering
@@ -278,6 +279,19 @@ const updateDriverStatus = async (req, res) => {
             });
         }
 
+        // Get current user data with location
+        const currentUser = await User.findOne(
+            { _id: id, role: 'DRIVER', isActive: true }
+        ).select('location driverInfo');
+
+        if (!currentUser) {
+            return res.status(404).json({
+                success: false,
+                error: 'Driver not found',
+                message: 'Driver does not exist or has been deactivated'
+            });
+        }
+
         const updatedUser = await User.findOneAndUpdate(
             { _id: id, role: 'DRIVER', isActive: true },
             {
@@ -287,19 +301,37 @@ const updateDriverStatus = async (req, res) => {
                 }
             },
             { new: true, runValidators: true }
-        ).select('driverInfo');
-
-        if (!updatedUser) {
-            return res.status(404).json({
-                success: false,
-                error: 'Driver not found',
-                message: 'Driver does not exist or has been deactivated'
-            });
-        }
+        ).select('driverInfo location');
 
         // Update isOnline based on driver status
         const isOnline = driverStatus === 'AVAILABLE' || driverStatus === 'BUSY' || driverStatus === 'IN_TRIP';
         await User.findByIdAndUpdate(id, { isOnline });
+
+        // Sync driver location with Trip Service for matching
+        try {
+            const tripServiceUrl = process.env.TRIP_SERVICE_URL || 'http://trip-service:3000';
+
+            if (updatedUser.location && updatedUser.location.latitude && updatedUser.location.longitude) {
+                await axios.post(`${tripServiceUrl}/drivers/location/sync`, {
+                    driverId: id,
+                    latitude: updatedUser.location.latitude,
+                    longitude: updatedUser.location.longitude,
+                    status: driverStatus
+                }, {
+                    timeout: 5000,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                console.log(`Driver location synced to Trip Service: ${id} -> ${driverStatus}`);
+            } else {
+                console.warn(`Driver ${id} status updated but no location available for sync`);
+            }
+        } catch (syncError) {
+            // Log sync error but don't fail the status update
+            console.error(`Failed to sync driver location with Trip Service: ${syncError.message}`);
+        }
 
         console.log(`Driver status updated: ${req.user.email} -> ${driverStatus}`);
 
@@ -309,7 +341,8 @@ const updateDriverStatus = async (req, res) => {
             data: {
                 driverStatus: updatedUser.driverInfo.driverStatus,
                 isOnline,
-                lastLocationUpdate: updatedUser.driverInfo.lastLocationUpdate
+                lastLocationUpdate: updatedUser.driverInfo.lastLocationUpdate,
+                locationSynced: !!(updatedUser.location && updatedUser.location.latitude && updatedUser.location.longitude)
             }
         });
 

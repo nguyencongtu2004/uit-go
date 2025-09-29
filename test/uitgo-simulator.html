@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UIT-Go Simulator - Tài xế & Hành khách</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        height: calc(100vh - 40px);
+      }
+
+      .panel {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        padding: 25px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .panel h2 {
+        color: #333;
+        margin-bottom: 20px;
+        text-align: center;
+        padding: 15px;
+        border-radius: 10px;
+        font-size: 24px;
+      }
+
+      .driver-panel h2 {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+      }
+
+      .passenger-panel h2 {
+        background: linear-gradient(135deg, #007bff, #6f42c1);
+        color: white;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+        color: #555;
+      }
+
+      input,
+      select,
+      button {
+        width: 100%;
+        padding: 12px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+      }
+
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+      }
+
+      button {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        margin: 5px 0;
+      }
+
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 123, 255, 0.4);
+      }
+
+      button:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .driver-panel button {
+        background: linear-gradient(135deg, #28a745, #20c997);
+      }
+
+      .driver-panel button:hover {
+        box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+      }
+
+      .status {
+        padding: 10px;
+        border-radius: 8px;
+        margin: 10px 0;
+        font-weight: 600;
+        text-align: center;
+      }
+
+      .status.online {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+
+      .status.offline {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+
+      .status.trip-active {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
+
+      .trip-info {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+      }
+
+      .trip-info h4 {
+        color: #495057;
+        margin-bottom: 10px;
+      }
+
+      .trip-info p {
+        margin: 5px 0;
+        color: #6c757d;
+      }
+
+      .log-container {
+        grid-column: 1 / -1;
+        background: #1a1a1a;
+        border-radius: 15px;
+        padding: 20px;
+        color: #00ff00;
+        font-family: "Courier New", monospace;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      .log-container h3 {
+        color: #ffffff;
+        margin-bottom: 15px;
+        text-align: center;
+      }
+
+      .log-entry {
+        margin: 5px 0;
+        padding: 5px;
+        border-left: 3px solid #00ff00;
+        padding-left: 10px;
+      }
+
+      .log-entry.error {
+        color: #ff6b6b;
+        border-left-color: #ff6b6b;
+      }
+
+      .log-entry.success {
+        color: #51cf66;
+        border-left-color: #51cf66;
+      }
+
+      .log-entry.info {
+        color: #74c0fc;
+        border-left-color: #74c0fc;
+      }
+
+      .notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 15px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 600;
+        z-index: 1000;
+        animation: slideIn 0.3s ease;
+      }
+
+      .notification.success {
+        background: #28a745;
+      }
+
+      .notification.error {
+        background: #dc3545;
+      }
+
+      .notification.info {
+        background: #17a2b8;
+      }
+
+      @keyframes slideIn {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
+      .timer {
+        background: #ffc107;
+        color: #212529;
+        padding: 10px;
+        border-radius: 8px;
+        text-align: center;
+        font-weight: bold;
+        margin: 10px 0;
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .actions button {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Driver Panel -->
+      <div class="panel driver-panel">
+        <h2>🚗 Tài Xế</h2>
+
+        <div class="form-group">
+          <label>Driver Token:</label>
+          <input
+            type="text"
+            id="driverToken"
+            placeholder="Nhập JWT token của tài xế"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Vị trí hiện tại:</label>
+          <input
+            type="number"
+            id="driverLat"
+            placeholder="Latitude"
+            step="any"
+            value="10.762622"
+          />
+          <input
+            type="number"
+            id="driverLng"
+            placeholder="Longitude"
+            step="any"
+            value="106.660172"
+            style="margin-top: 10px"
+          />
+        </div>
+
+        <button onclick="loginDriver()">Đăng nhập Tài xế</button>
+        <button onclick="toggleDriverStatus()" id="statusBtn" disabled>
+          Bật trạng thái hoạt động
+        </button>
+
+        <div id="driverStatus" class="status offline">Offline</div>
+
+        <div id="tripRequest" style="display: none">
+          <div class="trip-info">
+            <h4>🚨 Yêu cầu chuyến đi mới!</h4>
+            <p><strong>Từ:</strong> <span id="requestFrom"></span></p>
+            <p><strong>Đến:</strong> <span id="requestTo"></span></p>
+            <p>
+              <strong>Khoảng cách:</strong>
+              <span id="requestDistance"></span> km
+            </p>
+            <p><strong>Giá cước:</strong> <span id="requestFare"></span> VND</p>
+          </div>
+          <div class="timer" id="acceptTimer"></div>
+          <div class="actions">
+            <button onclick="acceptTrip()" style="background: #28a745">
+              Chấp nhận
+            </button>
+            <button onclick="rejectTrip()" style="background: #dc3545">
+              Từ chối
+            </button>
+          </div>
+        </div>
+
+        <div id="activeTrip" style="display: none">
+          <div class="trip-info">
+            <h4>🎯 Chuyến đi đang thực hiện</h4>
+            <p><strong>Trạng thái:</strong> <span id="tripStatus"></span></p>
+            <p><strong>Hành khách:</strong> <span id="passengerName"></span></p>
+            <p><strong>Từ:</strong> <span id="tripFrom"></span></p>
+            <p><strong>Đến:</strong> <span id="tripTo"></span></p>
+          </div>
+          <div class="actions">
+            <button
+              onclick="updateTripStatus('DRIVER_ARRIVING')"
+              id="arrivingBtn"
+            >
+              Đang đến điểm đón
+            </button>
+            <button
+              onclick="updateTripStatus('PICKED_UP')"
+              id="pickedUpBtn"
+              disabled
+            >
+              Đã đón khách
+            </button>
+            <button
+              onclick="updateTripStatus('IN_PROGRESS')"
+              id="inProgressBtn"
+              disabled
+            >
+              Bắt đầu chuyến đi
+            </button>
+            <button
+              onclick="updateTripStatus('COMPLETED')"
+              id="completedBtn"
+              disabled
+            >
+              Hoàn thành
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Passenger Panel -->
+      <div class="panel passenger-panel">
+        <h2>👤 Hành Khách</h2>
+
+        <div class="form-group">
+          <label>User Token:</label>
+          <input
+            type="text"
+            id="userToken"
+            placeholder="Nhập JWT token của hành khách"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Điểm đón:</label>
+          <select
+            id="pickupPreset"
+            onchange="setPickupLocation()"
+            style="margin-bottom: 10px"
+          >
+            <option value="">-- Chọn địa điểm có sẵn --</option>
+            <option value="10.762622,106.660172">Đại học UIT</option>
+            <option value="10.772622,106.670172">Lotte Mart Cộng Hòa</option>
+            <option value="10.782622,106.680172">Chợ Bến Thành</option>
+            <option value="10.792622,106.690172">Sân bay Tân Sơn Nhất</option>
+            <option value="custom">Nhập tọa độ tùy chỉnh</option>
+          </select>
+          <input
+            type="number"
+            id="pickupLat"
+            placeholder="Latitude"
+            step="any"
+            value="10.762622"
+          />
+          <input
+            type="number"
+            id="pickupLng"
+            placeholder="Longitude"
+            step="any"
+            value="106.660172"
+            style="margin-top: 10px"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Điểm đến:</label>
+          <select
+            id="destPreset"
+            onchange="setDestLocation()"
+            style="margin-bottom: 10px"
+          >
+            <option value="">-- Chọn địa điểm có sẵn --</option>
+            <option value="10.772622,106.670172">Lotte Mart Cộng Hòa</option>
+            <option value="10.762622,106.660172">Đại học UIT</option>
+            <option value="10.782622,106.680172">Chợ Bến Thành</option>
+            <option value="10.792622,106.690172">Sân bay Tân Sơn Nhất</option>
+            <option value="custom">Nhập tọa độ tùy chỉnh</option>
+          </select>
+          <input
+            type="number"
+            id="destLat"
+            placeholder="Latitude"
+            step="any"
+            value="10.772622"
+          />
+          <input
+            type="number"
+            id="destLng"
+            placeholder="Longitude"
+            step="any"
+            value="106.670172"
+            style="margin-top: 10px"
+          />
+        </div>
+
+        <button onclick="loginUser()">Đăng nhập Hành khách</button>
+        <button onclick="requestTrip()" id="requestBtn" disabled>Đặt xe</button>
+
+        <div id="userStatus" class="status offline">Chưa đăng nhập</div>
+
+        <div id="searchingTrip" style="display: none">
+          <div class="status trip-active">
+            <div>🔍 Đang tìm tài xế...</div>
+            <div class="timer" id="searchTimer"></div>
+          </div>
+          <button onclick="cancelTrip()" style="background: #dc3545">
+            Hủy chuyến
+          </button>
+        </div>
+
+        <div id="userActiveTrip" style="display: none">
+          <div class="trip-info">
+            <h4>🚗 Chuyến đi của bạn</h4>
+            <p>
+              <strong>Trạng thái:</strong> <span id="userTripStatus"></span>
+            </p>
+            <p><strong>Tài xế:</strong> <span id="driverName"></span></p>
+            <p><strong>Biển số:</strong> <span id="licensePlate"></span></p>
+            <p>
+              <strong>Giá cước:</strong> <span id="userTripFare"></span> VND
+            </p>
+          </div>
+          <button
+            onclick="cancelTrip()"
+            id="cancelBtn"
+            style="background: #dc3545"
+          >
+            Hủy chuyến
+          </button>
+
+          <div id="ratingSection" style="display: none; margin-top: 15px">
+            <label>Đánh giá tài xế:</label>
+            <select id="rating">
+              <option value="5">⭐⭐⭐⭐⭐ Tuyệt vời</option>
+              <option value="4">⭐⭐⭐⭐ Tốt</option>
+              <option value="3">⭐⭐⭐ Bình thường</option>
+              <option value="2">⭐⭐ Kém</option>
+              <option value="1">⭐ Rất kém</option>
+            </select>
+            <input
+              type="text"
+              id="comment"
+              placeholder="Nhận xét (tùy chọn)"
+              style="margin-top: 10px"
+            />
+            <button onclick="rateTrip()">Gửi đánh giá</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log Container -->
+    <div class="log-container">
+      <h3>📋 System Logs</h3>
+      <div id="logArea"></div>
+    </div>
+
+    <script>
+      // Global variables
+      let driverSocket = null;
+      let userSocket = null;
+      let currentTripId = null;
+      let acceptTimer = null;
+      let searchTimer = null;
+      let driverLoggedIn = false;
+      let userLoggedIn = false;
+      let driverOnline = false;
+
+      const API_BASE = "http://trip.localhost:81";
+      const DRIVER_API = "http://driver.localhost:81";
+      const USER_API = "http://user.localhost:81";
+
+      // Utility functions
+      function log(message, type = "info") {
+        const timestamp = new Date().toLocaleTimeString();
+        const logArea = document.getElementById("logArea");
+        const entry = document.createElement("div");
+        entry.className = `log-entry ${type}`;
+        entry.innerHTML = `[${timestamp}] ${message}`;
+        logArea.appendChild(entry);
+        logArea.scrollTop = logArea.scrollHeight;
+        console.log(`[${type.toUpperCase()}] ${message}`);
+      }
+
+      function showNotification(message, type = "info") {
+        const notification = document.createElement("div");
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          notification.remove();
+        }, 5000);
+      }
+
+      function formatDistance(meters) {
+        return (meters / 1000).toFixed(2);
+      }
+
+      function formatCurrency(amount) {
+        return new Intl.NumberFormat("vi-VN").format(amount);
+      }
+
+      function generateAddressFromCoords(lat, lng) {
+        // Simple address generation for PoC
+        const locations = [
+          "Lotte Mart Cộng Hòa",
+          "Đại học UIT",
+          "Công viên Hoàng Văn Thụ",
+          "Chợ Bến Thành",
+          "Nhà hát Thành phố",
+          "Trung tâm Diamond Plaza",
+          "Sân bay Tân Sơn Nhất",
+        ];
+
+        // Use coordinates to pick a location (for demo purposes)
+        const index =
+          Math.abs(Math.floor((lat + lng) * 1000)) % locations.length;
+        return locations[index] + ` (${lat.toFixed(6)}, ${lng.toFixed(6)})`;
+      }
+
+      function setPickupLocation() {
+        const preset = document.getElementById("pickupPreset").value;
+        if (preset && preset !== "custom") {
+          const [lat, lng] = preset.split(",");
+          document.getElementById("pickupLat").value = lat;
+          document.getElementById("pickupLng").value = lng;
+        }
+      }
+
+      function setDestLocation() {
+        const preset = document.getElementById("destPreset").value;
+        if (preset && preset !== "custom") {
+          const [lat, lng] = preset.split(",");
+          document.getElementById("destLat").value = lat;
+          document.getElementById("destLng").value = lng;
+        }
+      }
+
+      // Driver functions
+      async function loginDriver() {
+        const token = document.getElementById("driverToken").value.trim();
+        if (!token) {
+          showNotification("Vui lòng nhập Driver Token", "error");
+          return;
+        }
+
+        try {
+          // Verify token and get driver info from User Service (drivers are users with DRIVER role)
+          const response = await fetch(`${USER_API}/auth/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (!response.ok) {
+            throw new Error("Token không hợp lệ");
+          }
+
+          const driverData = await response.json();
+          if (driverData.data.user.role !== "DRIVER") {
+            throw new Error("Token không phải của tài xế");
+          }
+          log(
+            `Tài xế đăng nhập: ${driverData.data.user.fullName} - ${
+              driverData.data.user.driverInfo?.licensePlate || "N/A"
+            }`,
+            "success"
+          );
+
+          // Initialize WebSocket connection
+          driverSocket = io(`${API_BASE}`, {
+            transports: ["websocket", "polling"],
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            timeout: 20000,
+          });
+
+          driverSocket.on("connect", () => {
+            log("Tài xế kết nối WebSocket thành công", "success");
+            log(`Socket ID: ${driverSocket.id}`, "info");
+
+            // Authenticate after connection
+            driverSocket.emit("authenticate", {
+              userId: driverData.data.user.id,
+              userRole: "DRIVER",
+              token: token,
+            });
+            log("Gửi yêu cầu authenticate cho tài xế", "info");
+          });
+
+          driverSocket.on("authenticated", (data) => {
+            log(`Tài xế xác thực thành công: ${data.userId}`, "success");
+            driverLoggedIn = true;
+            document.getElementById("statusBtn").disabled = false;
+            showNotification("Đăng nhập tài xế thành công", "success");
+          });
+
+          driverSocket.on("auth_error", (error) => {
+            log(`Lỗi xác thực tài xế: ${error.message}`, "error");
+            showNotification("Lỗi xác thực tài xế", "error");
+          });
+
+          driverSocket.on("disconnect", (reason) => {
+            log(`Tài xế ngắt kết nối WebSocket: ${reason}`, "error");
+            driverLoggedIn = false;
+            document.getElementById("statusBtn").disabled = true;
+            showNotification(
+              `Mất kết nối WebSocket - Tài xế: ${reason}`,
+              "error"
+            );
+          });
+
+          driverSocket.on("connect_error", (error) => {
+            log(`Lỗi kết nối WebSocket tài xế: ${error.message}`, "error");
+            showNotification("Không thể kết nối WebSocket", "error");
+          });
+
+          driverSocket.on("reconnect", (attemptNumber) => {
+            log(
+              `Tài xế kết nối lại WebSocket (lần ${attemptNumber})`,
+              "success"
+            );
+          });
+
+          driverSocket.on("reconnect_error", (error) => {
+            log(`Lỗi kết nối lại WebSocket tài xế: ${error.message}`, "error");
+          });
+
+          driverSocket.on("trip_request", (data) => {
+            log(`🚗 NHẬN ĐƯỢC YÊU CẦU CHUYẾN ĐI!`, "success");
+            log(`Trip ID: ${data.tripId}`, "success");
+            log(
+              `Pickup: ${data.pickup?.address || JSON.stringify(data.pickup)}`,
+              "info"
+            );
+            log(
+              `Destination: ${
+                data.destination?.address || JSON.stringify(data.destination)
+              }`,
+              "info"
+            );
+            log(`Fare: ${data.estimatedFare} VND`, "info");
+            log(`Distance: ${data.distance} km`, "info");
+            log(`Timeout: ${data.timeout}s`, "info");
+            log(`Full data: ${JSON.stringify(data)}`, "info");
+
+            currentTripId = data.tripId;
+            showTripRequest(data);
+            showNotification("Có yêu cầu chuyến đi mới!", "success");
+          });
+
+          driverSocket.on("trip_notification", (data) => {
+            log(
+              `Thông báo chuyến đi cho tài xế: ${data.type} - ${data.message}`,
+              "info"
+            );
+            if (data.type === "trip_cancelled") {
+              hideTripRequest();
+              hideActiveTrip();
+              showNotification("Chuyến đi đã bị hủy", "error");
+            }
+          });
+        } catch (error) {
+          log(`Lỗi đăng nhập tài xế: ${error.message}`, "error");
+          showNotification(error.message, "error");
+        }
+      }
+
+      async function toggleDriverStatus() {
+        if (!driverLoggedIn) return;
+
+        const token = document.getElementById("driverToken").value;
+        const lat = parseFloat(document.getElementById("driverLat").value);
+        const lng = parseFloat(document.getElementById("driverLng").value);
+
+        try {
+          const newStatus = driverOnline ? "OFFLINE" : "ONLINE";
+
+          // Get user ID from token first
+          const profileResponse = await fetch(`${USER_API}/auth/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const userData = await profileResponse.json();
+          const userId = userData.data.user.id;
+
+          // Update driver status via User Service
+          const response = await fetch(
+            `${USER_API}/users/${userId}/driver-status`,
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                driverStatus: newStatus === "ONLINE" ? "AVAILABLE" : "OFFLINE",
+                location: { latitude: lat, longitude: lng },
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error("Không thể cập nhật trạng thái");
+          }
+
+          driverOnline = !driverOnline;
+          updateDriverStatusUI();
+          log(`Trạng thái tài xế: ${newStatus}`, "success");
+          showNotification(
+            `Đã ${driverOnline ? "bật" : "tắt"} trạng thái hoạt động`,
+            "success"
+          );
+        } catch (error) {
+          log(`Lỗi cập nhật trạng thái: ${error.message}`, "error");
+          showNotification(error.message, "error");
+        }
+      }
+
+      function updateDriverStatusUI() {
+        const statusDiv = document.getElementById("driverStatus");
+        const statusBtn = document.getElementById("statusBtn");
+
+        if (driverOnline) {
+          statusDiv.className = "status online";
+          statusDiv.textContent = "Online - Sẵn sàng nhận chuyến";
+          statusBtn.textContent = "Tắt trạng thái hoạt động";
+        } else {
+          statusDiv.className = "status offline";
+          statusDiv.textContent = "Offline";
+          statusBtn.textContent = "Bật trạng thái hoạt động";
+        }
+      }
+
+      function showTripRequest(data) {
+        currentTripId = data.tripId;
+        document.getElementById("requestFrom").textContent =
+          data.origin?.address ||
+          `${data.origin?.latitude}, ${data.origin?.longitude}`;
+        document.getElementById("requestTo").textContent =
+          data.destination?.address ||
+          `${data.destination?.latitude}, ${data.destination?.longitude}`;
+        document.getElementById("requestDistance").textContent = formatDistance(
+          data.estimatedDistance
+        );
+        document.getElementById("requestFare").textContent = formatCurrency(
+          data.estimatedFare
+        );
+
+        document.getElementById("tripRequest").style.display = "block";
+
+        // Start 15-second countdown
+        let timeLeft = 15;
+        const timerElement = document.getElementById("acceptTimer");
+        acceptTimer = setInterval(() => {
+          timerElement.textContent = `Thời gian còn lại: ${timeLeft}s`;
+          timeLeft--;
+
+          if (timeLeft < 0) {
+            clearInterval(acceptTimer);
+            hideTripRequest();
+            showNotification("Hết thời gian chấp nhận chuyến đi", "error");
+          }
+        }, 1000);
+      }
+
+      function hideTripRequest() {
+        document.getElementById("tripRequest").style.display = "none";
+        if (acceptTimer) {
+          clearInterval(acceptTimer);
+          acceptTimer = null;
+        }
+      }
+
+      async function acceptTrip() {
+        if (!currentTripId) return;
+
+        const token = document.getElementById("driverToken").value;
+
+        try {
+          const response = await fetch(
+            `${API_BASE}/trips/${currentTripId}/accept`,
+            {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error("Không thể chấp nhận chuyến đi");
+          }
+
+          const result = await response.json();
+          log(`Chấp nhận chuyến đi thành công: ${currentTripId}`, "success");
+          showNotification("Đã chấp nhận chuyến đi", "success");
+
+          // Subscribe to trip notifications
+          if (driverSocket && driverSocket.connected) {
+            driverSocket.emit("subscribe_trip", { tripId: currentTripId });
+          }
+
+          hideTripRequest();
+          showActiveTrip(result.data);
+        } catch (error) {
+          log(`Lỗi chấp nhận chuyến: ${error.message}`, "error");
+          showNotification(error.message, "error");
+        }
+      }
+
+      async function rejectTrip() {
+        log(`Từ chối chuyến đi: ${currentTripId}`, "info");
+        hideTripRequest();
+        currentTripId = null;
+        showNotification("Đã từ chối chuyến đi", "info");
+      }
+
+      function showActiveTrip(tripData) {
+        document.getElementById("tripStatus").textContent = tripData.status;
+        document.getElementById("passengerName").textContent =
+          tripData.passenger.fullName || tripData.passenger.name || "N/A";
+        document.getElementById("tripFrom").textContent =
+          tripData.origin?.address ||
+          `${tripData.origin?.latitude}, ${tripData.origin?.longitude}`;
+        document.getElementById("tripTo").textContent =
+          tripData.destination?.address ||
+          `${tripData.destination?.latitude}, ${tripData.destination?.longitude}`;
+
+        document.getElementById("activeTrip").style.display = "block";
+        updateTripButtons(tripData.status);
+      }
+
+      function hideActiveTrip() {
+        document.getElementById("activeTrip").style.display = "none";
+        currentTripId = null;
+      }
+
+      function updateTripButtons(status) {
+        const buttons = {
+          arrivingBtn: document.getElementById("arrivingBtn"),
+          pickedUpBtn: document.getElementById("pickedUpBtn"),
+          inProgressBtn: document.getElementById("inProgressBtn"),
+          completedBtn: document.getElementById("completedBtn"),
+        };
+
+        // Reset all buttons
+        Object.values(buttons).forEach((btn) => (btn.disabled = true));
+
+        switch (status) {
+          case "ACCEPTED":
+            buttons.arrivingBtn.disabled = false;
+            break;
+          case "DRIVER_ARRIVING":
+            buttons.pickedUpBtn.disabled = false;
+            break;
+          case "PICKED_UP":
+            buttons.inProgressBtn.disabled = false;
+            break;
+          case "IN_PROGRESS":
+            buttons.completedBtn.disabled = false;
+            break;
+        }
+      }
+
+      async function updateTripStatus(newStatus) {
+        if (!currentTripId) return;
+
+        const token = document.getElementById("driverToken").value;
+
+        try {
+          const response = await fetch(
+            `${API_BASE}/trips/${currentTripId}/status`,
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ status: newStatus }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error("Không thể cập nhật trạng thái chuyến đi");
+          }
+
+          const result = await response.json();
+          log(`Cập nhật trạng thái chuyến đi: ${newStatus}`, "success");
+          showNotification(`Trạng thái: ${newStatus}`, "success");
+
+          document.getElementById("tripStatus").textContent = newStatus;
+          updateTripButtons(newStatus);
+
+          if (newStatus === "COMPLETED") {
+            setTimeout(() => {
+              hideActiveTrip();
+              showNotification("Chuyến đi hoàn thành", "success");
+            }, 2000);
+          }
+        } catch (error) {
+          log(`Lỗi cập nhật trạng thái: ${error.message}`, "error");
+          showNotification(error.message, "error");
+        }
+      }
+
+      // User functions
+      async function loginUser() {
+        const token = document.getElementById("userToken").value.trim();
+        if (!token) {
+          showNotification("Vui lòng nhập User Token", "error");
+          return;
+        }
+
+        try {
+          // Verify token
+          const response = await fetch(`${USER_API}/auth/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (!response.ok) {
+            throw new Error("Token không hợp lệ");
+          }
+
+          const userData = await response.json();
+          if (userData.data.user.role !== "PASSENGER") {
+            throw new Error("Token không phải của hành khách");
+          }
+          log(
+            `Hành khách đăng nhập: ${userData.data.user.fullName}`,
+            "success"
+          );
+
+          // Initialize WebSocket connection
+          userSocket = io(`${API_BASE}`, {
+            transports: ["websocket", "polling"],
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            timeout: 20000,
+          });
+
+          userSocket.on("connect", () => {
+            log("Hành khách kết nối WebSocket thành công", "success");
+            log(`Socket ID: ${userSocket.id}`, "info");
+
+            // Authenticate after connection
+            userSocket.emit("authenticate", {
+              userId: userData.data.user.id,
+              userRole: "PASSENGER",
+              token: token,
+            });
+            log("Gửi yêu cầu authenticate cho hành khách", "info");
+          });
+
+          userSocket.on("authenticated", (data) => {
+            log(`Hành khách xác thực thành công: ${data.userId}`, "success");
+            userLoggedIn = true;
+            document.getElementById("requestBtn").disabled = false;
+            document.getElementById("userStatus").className = "status online";
+            document.getElementById("userStatus").textContent = "Đã đăng nhập";
+            showNotification("Đăng nhập hành khách thành công", "success");
+          });
+
+          userSocket.on("trip_subscribed", (data) => {
+            log(`Đã subscribe trip: ${data.tripId}`, "info");
+          });
+
+          userSocket.on("auth_error", (error) => {
+            log(`Lỗi xác thực hành khách: ${error.message}`, "error");
+            showNotification("Lỗi xác thực hành khách", "error");
+          });
+
+          userSocket.on("disconnect", (reason) => {
+            log(`Hành khách ngắt kết nối WebSocket: ${reason}`, "error");
+            userLoggedIn = false;
+            document.getElementById("requestBtn").disabled = true;
+            document.getElementById("userStatus").className = "status offline";
+            document.getElementById(
+              "userStatus"
+            ).textContent = `Mất kết nối: ${reason}`;
+            showNotification(
+              `Mất kết nối WebSocket - Hành khách: ${reason}`,
+              "error"
+            );
+          });
+
+          userSocket.on("connect_error", (error) => {
+            log(`Lỗi kết nối WebSocket hành khách: ${error.message}`, "error");
+            showNotification("Không thể kết nối WebSocket", "error");
+          });
+
+          userSocket.on("reconnect", (attemptNumber) => {
+            log(
+              `Hành khách kết nối lại WebSocket (lần ${attemptNumber})`,
+              "success"
+            );
+          });
+
+          userSocket.on("reconnect_error", (error) => {
+            log(
+              `Lỗi kết nối lại WebSocket hành khách: ${error.message}`,
+              "error"
+            );
+          });
+
+          userSocket.on("trip_notification", (data) => {
+            log(
+              `Thông báo chuyến đi cho hành khách: ${data.type} - ${data.message}`,
+              "info"
+            );
+
+            switch (data.type) {
+              case "trip_accepted":
+                log(
+                  `Tài xế đã chấp nhận chuyến đi: ${JSON.stringify(data.data)}`,
+                  "success"
+                );
+                hideSearchingTrip();
+                showUserActiveTrip(data.data);
+                break;
+              case "trip_cancelled":
+                hideSearchingTrip();
+                hideUserActiveTrip();
+                showNotification("Chuyến đi đã bị hủy", "error");
+                break;
+              default:
+                // Handle other trip status updates
+                if (data.data && data.data.newState) {
+                  updateUserTripStatus(data.data.newState);
+                }
+                break;
+            }
+          });
+        } catch (error) {
+          log(`Lỗi đăng nhập hành khách: ${error.message}`, "error");
+          showNotification(error.message, "error");
+        }
+      }
+
+      async function requestTrip() {
+        if (!userLoggedIn) return;
+
+        const token = document.getElementById("userToken").value;
+        const pickupLat = parseFloat(
+          document.getElementById("pickupLat").value
+        );
+        const pickupLng = parseFloat(
+          document.getElementById("pickupLng").value
+        );
+        const destLat = parseFloat(document.getElementById("destLat").value);
+        const destLng = parseFloat(document.getElementById("destLng").value);
+
+        try {
+          const response = await fetch(`${API_BASE}/booking/request`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              origin: {
+                latitude: pickupLat,
+                longitude: pickupLng,
+                address: generateAddressFromCoords(pickupLat, pickupLng),
+              },
+              destination: {
+                latitude: destLat,
+                longitude: destLng,
+                address: generateAddressFromCoords(destLat, destLng),
+              },
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error("Không thể đặt xe");
+          }
+
+          const result = await response.json();
+          currentTripId = result.data.trip.id;
+          log(`Đặt xe thành công: ${currentTripId}`, "success");
+          showNotification("Đang tìm tài xế...", "success");
+
+          // Subscribe to trip notifications - wait for authentication
+          if (userSocket && userSocket.connected && userLoggedIn) {
+            userSocket.emit("subscribe_trip", { tripId: currentTripId });
+            log(`Đã subscribe trip: ${currentTripId}`, "info");
+          } else {
+            log("WebSocket chưa authenticated, sẽ subscribe sau", "warning");
+          }
+
+          showSearchingTrip();
+        } catch (error) {
+          log(`Lỗi đặt xe: ${error.message}`, "error");
+          showNotification(error.message, "error");
+        }
+      }
+
+      function showSearchingTrip() {
+        document.getElementById("searchingTrip").style.display = "block";
+        document.getElementById("requestBtn").disabled = true;
+
+        // Start search timer
+        let timeElapsed = 0;
+        const timerElement = document.getElementById("searchTimer");
+        searchTimer = setInterval(() => {
+          timeElapsed++;
+          timerElement.textContent = `Đã tìm: ${timeElapsed}s`;
+        }, 1000);
+      }
+
+      function hideSearchingTrip() {
+        document.getElementById("searchingTrip").style.display = "none";
+        document.getElementById("requestBtn").disabled = false;
+        if (searchTimer) {
+          clearInterval(searchTimer);
+          searchTimer = null;
+        }
+      }
+
+      function showUserActiveTrip(tripData) {
+        document.getElementById("userTripStatus").textContent = tripData.status;
+        document.getElementById("driverName").textContent =
+          tripData.driver.fullName || tripData.driver.name || "N/A";
+        document.getElementById("licensePlate").textContent =
+          tripData.driver.driverInfo?.licensePlate ||
+          tripData.driver.licensePlate ||
+          "N/A";
+        document.getElementById("userTripFare").textContent = formatCurrency(
+          tripData.estimatedFare
+        );
+
+        document.getElementById("userActiveTrip").style.display = "block";
+      }
+
+      function hideUserActiveTrip() {
+        document.getElementById("userActiveTrip").style.display = "none";
+        document.getElementById("ratingSection").style.display = "none";
+        currentTripId = null;
+      }
+
+      function updateUserTripStatus(status) {
+        document.getElementById("userTripStatus").textContent = status;
+
+        // Show rating section when trip is completed
+        if (status === "COMPLETED") {
+          document.getElementById("cancelBtn").style.display = "none";
+          document.getElementById("ratingSection").style.display = "block";
+          showNotification(
+            "Chuyến đi hoàn thành! Hãy đánh giá tài xế.",
+            "success"
+          );
+        }
+      }
+
+      async function cancelTrip() {
+        if (!currentTripId) return;
+
+        const token = document.getElementById("userToken").value;
+
+        try {
+          const response = await fetch(
+            `${API_BASE}/trips/${currentTripId}/cancel`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error("Không thể hủy chuyến đi");
+          }
+
+          log(`Hủy chuyến đi: ${currentTripId}`, "success");
+          showNotification("Đã hủy chuyến đi", "success");
+
+          hideSearchingTrip();
+          hideUserActiveTrip();
+        } catch (error) {
+          log(`Lỗi hủy chuyến: ${error.message}`, "error");
+          showNotification(error.message, "error");
+        }
+      }
+
+      async function rateTrip() {
+        if (!currentTripId) return;
+
+        const token = document.getElementById("userToken").value;
+        const rating = parseInt(document.getElementById("rating").value);
+        const comment = document.getElementById("comment").value.trim();
+
+        try {
+          const response = await fetch(
+            `${API_BASE}/trips/${currentTripId}/rate`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                rating: rating,
+                comment: comment || undefined,
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error("Không thể gửi đánh giá");
+          }
+
+          log(`Đánh giá chuyến đi: ${rating} sao`, "success");
+          showNotification("Cảm ơn bạn đã đánh giá!", "success");
+
+          setTimeout(() => {
+            hideUserActiveTrip();
+          }, 2000);
+        } catch (error) {
+          log(`Lỗi gửi đánh giá: ${error.message}`, "error");
+          showNotification(error.message, "error");
+        }
+      }
+
+      // Initialize
+      log("UIT-Go Simulator khởi động", "success");
+      log("API Endpoints:", "info");
+      log(`- User Service: ${USER_API}`, "info");
+      log(`- Driver Service: ${DRIVER_API}`, "info");
+      log(`- Trip Service (WebSocket): ${API_BASE}`, "info");
+      log("Hướng dẫn sử dụng:", "info");
+      log("1. Chạy: docker compose up --build -d", "info");
+      log(
+        "2. Tạo test tokens: .\\create-test-users.ps1 -PassengerCount 1 -DriverCount 1",
+        "info"
+      );
+      log("3. Nhập token JWT cho tài xế và hành khách", "info");
+      log("4. Đăng nhập để kết nối WebSocket", "info");
+      log("5. Tài xế: Bật trạng thái hoạt động để nhận chuyến", "info");
+      log("6. Hành khách: Nhập tọa độ và đặt xe", "info");
+      log("7. Theo dõi logs để xem quá trình real-time", "info");
+
+      // Test WebSocket connection status periodically
+      setInterval(() => {
+        if (driverSocket && driverLoggedIn) {
+          log(
+            `Driver WebSocket Status: ${
+              driverSocket.connected ? "Connected" : "Disconnected"
+            }`,
+            driverSocket.connected ? "success" : "error"
+          );
+        }
+        if (userSocket && userLoggedIn) {
+          log(
+            `User WebSocket Status: ${
+              userSocket.connected ? "Connected" : "Disconnected"
+            }`,
+            userSocket.connected ? "success" : "error"
+          );
+        }
+      }, 30000); // Check every 30 seconds
+    </script>
+  </body>
+</html>
