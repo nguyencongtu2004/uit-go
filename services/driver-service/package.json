@@ -24,7 +24,8 @@
         "mongoose": "^7.6.0",
         "ioredis": "^5.3.2",
         "axios": "^1.6.0",
-        "dotenv": "^16.3.1"
+        "dotenv": "^16.3.1",
+        "kafkajs": "^2.2.4"
     },
     "devDependencies": {
         "nodemon": "^3.0.1",

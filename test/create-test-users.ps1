@@ -2,8 +2,8 @@
 # Tạo users hàng loạt và lấy authentication tokens để sử dụng cho load testing
 
 param(
-    [int]$PassengerCount = 50,
-    [int]$DriverCount = 100,
+    [int]$PassengerCount = 1,
+    [int]$DriverCount = 1,
     [string]$BaseUrl = "http://user.localhost:81",
     [string]$OutputDir = "./test-data",
     [string]$Password = "LoadTest123!"

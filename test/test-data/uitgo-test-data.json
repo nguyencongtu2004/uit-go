@@ -1,11 +1,14 @@
 ﻿{
     "quickAccess":  {
-                        "passengerTokens":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NjciLCJlbWFpbCI6InBhc3NlbmdlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IlBBU1NFTkdFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.fS0e3r0wTkLozQ9zEefsPIfSxABywZeQXtbCjIkMohU",
-                        "allTokens":  [
-                                          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NjciLCJlbWFpbCI6InBhc3NlbmdlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IlBBU1NFTkdFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.fS0e3r0wTkLozQ9zEefsPIfSxABywZeQXtbCjIkMohU",
-                                          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NmEiLCJlbWFpbCI6ImRyaXZlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IkRSSVZFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.hR3S9Yqs6qZEVyXFrMwRcmlKf2zkGaI6rsYrVK4w0as"
-                                      ],
-                        "driverTokens":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NmEiLCJlbWFpbCI6ImRyaXZlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IkRSSVZFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.hR3S9Yqs6qZEVyXFrMwRcmlKf2zkGaI6rsYrVK4w0as",
+                        "passengerTokens":  {
+
+                                            },
+                        "allTokens":  {
+
+                                      },
+                        "driverTokens":  {
+
+                                         },
                         "sampleUsers":  {
                                             "sampleDriver":  null,
                                             "samplePassenger":  null
@@ -15,68 +18,26 @@
                         "scenarios":  {
                                           "mediumLoad":  {
                                                              "passengers":  {
-                                                                                "success":  true,
-                                                                                "user":  {
-                                                                                             "id":  "68d92ad2d8c6262c281c0467",
-                                                                                             "email":  "passenger1@uitgo-load.test",
-                                                                                             "fullName":  "Test Passenger 1",
-                                                                                             "role":  "PASSENGER"
-                                                                                         },
-                                                                                "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NjciLCJlbWFpbCI6InBhc3NlbmdlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IlBBU1NFTkdFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.fS0e3r0wTkLozQ9zEefsPIfSxABywZeQXtbCjIkMohU"
+
                                                                             },
                                                              "drivers":  {
-                                                                             "success":  true,
-                                                                             "user":  {
-                                                                                          "id":  "68d92ad2d8c6262c281c046a",
-                                                                                          "email":  "driver1@uitgo-load.test",
-                                                                                          "fullName":  "Test Driver 1",
-                                                                                          "role":  "DRIVER"
-                                                                                      },
-                                                                             "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NmEiLCJlbWFpbCI6ImRyaXZlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IkRSSVZFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.hR3S9Yqs6qZEVyXFrMwRcmlKf2zkGaI6rsYrVK4w0as"
+
                                                                          }
                                                          },
                                           "heavyLoad":  {
                                                             "passengers":  {
-                                                                               "success":  true,
-                                                                               "user":  {
-                                                                                            "id":  "68d92ad2d8c6262c281c0467",
-                                                                                            "email":  "passenger1@uitgo-load.test",
-                                                                                            "fullName":  "Test Passenger 1",
-                                                                                            "role":  "PASSENGER"
-                                                                                        },
-                                                                               "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NjciLCJlbWFpbCI6InBhc3NlbmdlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IlBBU1NFTkdFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.fS0e3r0wTkLozQ9zEefsPIfSxABywZeQXtbCjIkMohU"
+
                                                                            },
                                                             "drivers":  {
-                                                                            "success":  true,
-                                                                            "user":  {
-                                                                                         "id":  "68d92ad2d8c6262c281c046a",
-                                                                                         "email":  "driver1@uitgo-load.test",
-                                                                                         "fullName":  "Test Driver 1",
-                                                                                         "role":  "DRIVER"
-                                                                                     },
-                                                                            "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NmEiLCJlbWFpbCI6ImRyaXZlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IkRSSVZFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.hR3S9Yqs6qZEVyXFrMwRcmlKf2zkGaI6rsYrVK4w0as"
+
                                                                         }
                                                         },
                                           "lightLoad":  {
                                                             "passengers":  {
-                                                                               "success":  true,
-                                                                               "user":  {
-                                                                                            "id":  "68d92ad2d8c6262c281c0467",
-                                                                                            "email":  "passenger1@uitgo-load.test",
-                                                                                            "fullName":  "Test Passenger 1",
-                                                                                            "role":  "PASSENGER"
-                                                                                        },
-                                                                               "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NjciLCJlbWFpbCI6InBhc3NlbmdlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IlBBU1NFTkdFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.fS0e3r0wTkLozQ9zEefsPIfSxABywZeQXtbCjIkMohU"
+
                                                                            },
                                                             "drivers":  {
-                                                                            "success":  true,
-                                                                            "user":  {
-                                                                                         "id":  "68d92ad2d8c6262c281c046a",
-                                                                                         "email":  "driver1@uitgo-load.test",
-                                                                                         "fullName":  "Test Driver 1",
-                                                                                         "role":  "DRIVER"
-                                                                                     },
-                                                                            "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NmEiLCJlbWFpbCI6ImRyaXZlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IkRSSVZFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.hR3S9Yqs6qZEVyXFrMwRcmlKf2zkGaI6rsYrVK4w0as"
+
                                                                         }
                                                         }
                                       },
@@ -88,37 +49,27 @@
                     },
     "users":  {
                   "passengers":  {
-                                     "id":  "68d92ad2d8c6262c281c0467",
-                                     "fullName":  "Test Passenger 1",
-                                     "createdForTesting":  true,
-                                     "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NjciLCJlbWFpbCI6InBhc3NlbmdlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IlBBU1NFTkdFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.fS0e3r0wTkLozQ9zEefsPIfSxABywZeQXtbCjIkMohU",
-                                     "email":  "passenger1@uitgo-load.test",
-                                     "role":  "PASSENGER"
+
                                  },
                   "drivers":  {
-                                  "id":  "68d92ad2d8c6262c281c046a",
-                                  "fullName":  "Test Driver 1",
-                                  "createdForTesting":  true,
-                                  "token":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NmEiLCJlbWFpbCI6ImRyaXZlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IkRSSVZFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.hR3S9Yqs6qZEVyXFrMwRcmlKf2zkGaI6rsYrVK4w0as",
-                                  "email":  "driver1@uitgo-load.test",
-                                  "role":  "DRIVER"
+
                               }
               },
     "metadata":  {
                      "version":  "1.0",
-                     "createdAt":  "2025-09-28T12:32:19Z",
+                     "createdAt":  "2025-09-29T15:12:46Z",
                      "baseUrl":  "http://user.localhost:81",
                      "summary":  {
                                      "passengers":  {
-                                                        "created":  null,
+                                                        "created":  0,
                                                         "requested":  1
                                                     },
                                      "drivers":  {
-                                                     "created":  null,
+                                                     "created":  0,
                                                      "requested":  1
                                                  }
                                  },
-                     "totalUsers":  2,
+                     "totalUsers":  0,
                      "createdBy":  "UIT-Go Mass User Generator"
                  }
 }

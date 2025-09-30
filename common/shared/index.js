@@ -7,6 +7,8 @@ const Logger = require('./logger');
 const APIResponse = require('./apiResponse');
 const Validator = require('./validator');
 const RedisManager = require('./redisManager');
+const KafkaClient = require('./kafkaClient');
+const EventSchemas = require('./eventSchemas');
 const {
     CHANNELS,
     CHANNEL_PATTERNS,
@@ -27,6 +29,10 @@ module.exports = {
 
     // Redis and Caching
     RedisManager,
+
+    // Kafka Event Streaming
+    KafkaClient,
+    EventSchemas,
 
     // Pub/Sub Messaging
     CHANNELS,

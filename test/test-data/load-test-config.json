@@ -37,20 +37,28 @@
                  },
     "testUsers":  {
                       "light":  {
-                                    "passengers":  null,
+                                    "passengers":  0,
                                     "tokens":  {
-                                                   "passengers":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NjciLCJlbWFpbCI6InBhc3NlbmdlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IlBBU1NFTkdFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.fS0e3r0wTkLozQ9zEefsPIfSxABywZeQXtbCjIkMohU",
-                                                   "drivers":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NmEiLCJlbWFpbCI6ImRyaXZlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IkRSSVZFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.hR3S9Yqs6qZEVyXFrMwRcmlKf2zkGaI6rsYrVK4w0as"
+                                                   "passengers":  {
+
+                                                                  },
+                                                   "drivers":  {
+
+                                                               }
                                                },
-                                    "drivers":  null
+                                    "drivers":  0
                                 },
                       "heavy":  {
-                                    "passengers":  null,
+                                    "passengers":  0,
                                     "tokens":  {
-                                                   "passengers":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NjciLCJlbWFpbCI6InBhc3NlbmdlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IlBBU1NFTkdFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.fS0e3r0wTkLozQ9zEefsPIfSxABywZeQXtbCjIkMohU",
-                                                   "drivers":  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGQ5MmFkMmQ4YzYyNjJjMjgxYzA0NmEiLCJlbWFpbCI6ImRyaXZlcjFAdWl0Z28tbG9hZC50ZXN0Iiwicm9sZSI6IkRSSVZFUiIsImlhdCI6MTc1OTA2MjczOSwiZXhwIjoxNzU5MTQ5MTM5fQ.hR3S9Yqs6qZEVyXFrMwRcmlKf2zkGaI6rsYrVK4w0as"
+                                                   "passengers":  {
+
+                                                                  },
+                                                   "drivers":  {
+
+                                                               }
                                                },
-                                    "drivers":  null
+                                    "drivers":  0
                                 }
                   }
 }

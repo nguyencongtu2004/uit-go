@@ -1,0 +1,23 @@
+{
+  "name": "uit-go-kafka-tests",
+  "version": "1.0.0",
+  "description": "Kafka Event-Driven Architecture tests for UIT-Go",
+  "scripts": {
+    "test": "node test-event-flow.js",
+    "test:docker": "docker run --rm --network uit-go_uit-go-network -v ${PWD}:/workspace -w /workspace node:18-alpine sh -c \"npm install kafkajs && node test-kafka-docker.js\"",
+    "test:producer-consumer": "node test-producer-consumer.js",
+    "test:connectivity": "node test-event-flow.js",
+    "setup:topics": "node direct-setup-topics.js",
+    "check:architecture": "node check-kafka-architecture.js || echo 'Architecture check script not found'"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4"
+  },
+  "keywords": [
+    "kafka",
+    "event-driven",
+    "load-testing",
+    "uit-go"
+  ],
+  "author": "UIT-Go Team"
+}
