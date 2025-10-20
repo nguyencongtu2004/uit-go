@@ -1,0 +1,384 @@
+{
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [
+      {
+        "name": "User Service",
+        "path": "::User Service",
+        "id": "313cedae15d7b0c45867c1f49dd841fc",
+        "groups": [],
+        "checks": [
+            {
+              "name": "status is 200",
+              "path": "::User Service::status is 200",
+              "id": "1fb983b8d2769f3d24e3a98a4c00315e",
+              "passes": 8,
+              "fails": 0
+            },
+            {
+              "id": "42689047c884f65428c86e2d55f92a88",
+              "passes": 8,
+              "fails": 0,
+              "name": "response time < 300ms",
+              "path": "::User Service::response time < 300ms"
+            },
+            {
+              "id": "6a65c40693414304b09897e19e40cf06",
+              "passes": 8,
+              "fails": 0,
+              "name": "has valid JSON",
+              "path": "::User Service::has valid JSON"
+            }
+          ]
+      },
+      {
+        "name": "Driver Service",
+        "path": "::Driver Service",
+        "id": "67081f06ff2a14ac33f86d7ebc75b9d2",
+        "groups": [],
+        "checks": [
+            {
+              "name": "status is 200",
+              "path": "::Driver Service::status is 200",
+              "id": "1ac8ae2c52e466da5124059a9bfb6904",
+              "passes": 8,
+              "fails": 0
+            },
+            {
+              "name": "response time < 300ms",
+              "path": "::Driver Service::response time < 300ms",
+              "id": "0f4dfb656fb809b04426985d20e0faa4",
+              "passes": 8,
+              "fails": 0
+            },
+            {
+              "passes": 8,
+              "fails": 0,
+              "name": "has valid JSON",
+              "path": "::Driver Service::has valid JSON",
+              "id": "a34bd560432251a0640d19ee3cad5ce3"
+            }
+          ]
+      },
+      {
+        "id": "68ad240d25967e945a1b52d027cb408a",
+        "groups": [],
+        "checks": [
+            {
+              "name": "status is 200",
+              "path": "::Trip Service::status is 200",
+              "id": "0fadfe79a1b7d6df7c821607ba8e973f",
+              "passes": 8,
+              "fails": 0
+            },
+            {
+              "id": "5cc24696cc912bed4d8cc1f0484860d1",
+              "passes": 8,
+              "fails": 0,
+              "name": "response time < 300ms",
+              "path": "::Trip Service::response time < 300ms"
+            },
+            {
+              "name": "has valid JSON",
+              "path": "::Trip Service::has valid JSON",
+              "id": "00008ff7058a54538a4f41f1c6da96e7",
+              "passes": 8,
+              "fails": 0
+            }
+          ],
+        "name": "Trip Service",
+        "path": "::Trip Service"
+      }
+    ],
+    "checks": []
+  },
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  },
+  "state": {
+    "isStdOutTTY": true,
+    "isStdErrTTY": true,
+    "testRunDurationMs": 1140.1582
+  },
+  "metrics": {
+    "vus_max": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "max": 500,
+        "value": 500,
+        "min": 500
+      }
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 17742,
+        "rate": 15560.998464949866
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0.2056083333333333,
+        "min": 0,
+        "med": 0,
+        "max": 1.0566,
+        "p(90)": 0.52737,
+        "p(95)": 0.534715
+      }
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0,
+        "min": 0,
+        "med": 0,
+        "max": 0,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    },
+    "health_check_duration": {
+      "type": "trend",
+      "contains": "default",
+      "values": {
+        "max": 7,
+        "p(90)": 4,
+        "p(95)": 4.849999999999998,
+        "avg": 2.625,
+        "min": 1,
+        "med": 2
+      }
+    },
+    "http_req_duration": {
+      "contains": "time",
+      "values": {
+        "min": 1.5155,
+        "med": 2.14605,
+        "max": 4.8016,
+        "p(90)": 3.0567999999999995,
+        "p(95)": 3.21732,
+        "avg": 2.3959458333333337
+      },
+      "thresholds": {
+        "p(95)<300": {
+          "ok": true
+        },
+        "p(99)<1000": {
+          "ok": true
+        }
+      },
+      "type": "trend"
+    },
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 24
+      },
+      "thresholds": {
+        "rate<0.10": {
+          "ok": true
+        }
+      }
+    },
+    "group_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 2.1091,
+        "med": 2.66735,
+        "max": 8.6215,
+        "p(90)": 3.75305,
+        "p(95)": 4.201039999999999,
+        "avg": 3.107254166666666
+      }
+    },
+    "http_req_waiting": {
+      "values": {
+        "min": 1.5155,
+        "med": 2.1390000000000002,
+        "max": 4.2168,
+        "p(90)": 2.68085,
+        "p(95)": 2.690555,
+        "avg": 2.214904166666667
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 0.52807,
+        "p(95)": 0.5762949999999999,
+        "avg": 0.15856666666666666,
+        "min": 0,
+        "med": 0,
+        "max": 0.6239
+      }
+    },
+    "error_count": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 24,
+        "rate": 21.0497104700032
+      }
+    },
+    "http_req_blocked": {
+      "values": {
+        "p(95)": 1.06413,
+        "avg": 0.3402833333333333,
+        "min": 0,
+        "med": 0,
+        "max": 2.6934,
+        "p(90)": 0.9013399999999996
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 2.3959458333333337,
+        "min": 1.5155,
+        "med": 2.14605,
+        "max": 4.8016,
+        "p(90)": 3.0567999999999995,
+        "p(95)": 3.21732
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 1912,
+        "rate": 1676.9602674435882
+      }
+    },
+    "success_rate": {
+      "contains": "default",
+      "values": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 0
+      },
+      "thresholds": {
+        "rate>0.90": {
+          "ok": true
+        }
+      },
+      "type": "rate"
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "passes": 72,
+        "fails": 0,
+        "rate": 1
+      }
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 24,
+        "rate": 21.0497104700032
+      }
+    },
+    "http_req_sending": {
+      "values": {
+        "min": 0,
+        "med": 0,
+        "max": 0.5394,
+        "p(90)": 0,
+        "p(95)": 0,
+        "avg": 0.022475
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 4,
+        "rate": 3.508285078333867
+      }
+    },
+    "trip_service_errors": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 7.016570156667734,
+        "count": 8
+      }
+    },
+    "user_service_errors": {
+      "contains": "default",
+      "values": {
+        "count": 8,
+        "rate": 7.016570156667734
+      },
+      "type": "counter"
+    },
+    "driver_service_errors": {
+      "contains": "default",
+      "values": {
+        "count": 8,
+        "rate": 7.016570156667734
+      },
+      "type": "counter"
+    },
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 515.5156999999999,
+        "p(95)": 516.4955,
+        "avg": 511.769675,
+        "min": 507.8105,
+        "med": 510.89645,
+        "max": 517.4753
+      }
+    },
+    "service_health_score": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "max": 0,
+        "value": 0,
+        "min": 0
+      }
+    },
+    "vus": {
+      "type": "gauge",
+      "contains": "default",
+      "values": {
+        "value": 4,
+        "min": 4,
+        "max": 4
+      }
+    }
+  }
+}
