@@ -9,7 +9,7 @@
 ### 1️⃣ Cài đặt k6 (lần đầu)
 ```powershell
 choco install k6
-hoặc lên trang chủ k6 tải về
+# hoặc lên trang chủ k6 tải về
 ```
 
 ### 2️⃣ Sửa DNS (lần đầu)
