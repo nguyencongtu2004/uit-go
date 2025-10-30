@@ -1,77 +1,77 @@
-# ADR 002: Event-Driven Architecture with Apache Kafka
+# ADR 002: Kiến trúc Event-Driven với Apache Kafka
 
-**Status**: Accepted  
-**Date**: 2025-10-16  
-**Deciders**: Technical Architecture Team  
+**Trạng thái**: Đã chấp nhận  
+**Ngày**: 2025-10-16  
+**Người quyết định**: Nhóm Kiến trúc Kỹ thuật  
 **Tags**: `architecture`, `messaging`, `scalability`, `microservices`
 
 ---
 
-## Context and Problem Statement
+## Bối cảnh và Vấn đề
 
-In a ride-hailing platform, multiple services need to coordinate and react to business events (trip requested, trip accepted, driver location updated, etc.). We need a reliable communication mechanism that:
+Trong nền tảng gọi xe, nhiều dịch vụ cần phối hợp và phản ứng với các sự kiện nghiệp vụ (yêu cầu chuyến đi, chấp nhận chuyến đi, cập nhật vị trí tài xế, v.v.). Chúng ta cần một cơ chế giao tiếp đáng tin cậy để:
 
-- **Decouples services**: Services shouldn't directly depend on each other
-- **Handles high throughput**: 1000+ events/second during peak hours
-- **Guarantees delivery**: Critical events must not be lost
-- **Enables event sourcing**: Audit trail of all business events
-- **Scales horizontally**: Can add more consumers as load increases
+- **Tách rời các dịch vụ**: Các dịch vụ không nên phụ thuộc trực tiếp vào nhau
+- **Xử lý throughput cao**: 1000+ sự kiện/giây trong giờ cao điểm
+- **Đảm bảo gửi**: Các sự kiện quan trọng không được mất
+- **Kích hoạt event sourcing**: Audit trail của tất cả các sự kiện nghiệp vụ
+- **Mở rộng theo chiều ngang**: Có thể thêm nhiều consumer khi tải tăng
 
-We needed to choose between:
+Chúng ta cần lựa chọn giữa:
 
-1. **Apache Kafka** - Distributed event streaming platform
-2. **Direct HTTP/REST calls** - Synchronous service-to-service communication
-3. **AWS SQS/SNS** - Managed message queue service
-4. **RabbitMQ** - Traditional message broker
-
----
-
-## Decision Drivers
-
-### Functional Requirements
-
-- **Event streaming**: Publish business events to multiple consumers
-- **Guaranteed delivery**: At-least-once delivery semantics
-- **Message ordering**: Maintain order per partition key (e.g., tripId)
-- **Event replay**: Ability to reprocess historical events
-- **Consumer groups**: Multiple instances consuming in parallel
-
-### Non-Functional Requirements
-
-- **Throughput**: Handle 1000+ messages/second
-- **Latency**: <100ms end-to-end event delivery
-- **Scalability**: Horizontal scaling for producers and consumers
-- **Fault tolerance**: Survive broker failures without data loss
-- **Operational complexity**: Manageable for small team
+1. **Apache Kafka** - Nền tảng event streaming phân tán
+2. **Direct HTTP/REST calls** - Giao tiếp đồng bộ service-to-service
+3. **AWS SQS/SNS** - Dịch vụ message queue được quản lý
+4. **RabbitMQ** - Message broker truyền thống
 
 ---
 
-## Considered Options
+## Yếu tố Quyết định
 
-### Option 1: Apache Kafka (Event Streaming Platform)
+### Yêu cầu Chức năng
 
-**Description**: Distributed commit log designed for high-throughput event streaming.
+- **Event streaming**: Xuất bản các sự kiện nghiệp vụ cho nhiều consumer
+- **Đảm bảo gửi**: Ngữ nghĩa gửi ít nhất một lần (at-least-once)
+- **Thứ tự message**: Duy trì thứ tự cho mỗi partition key (ví dụ: tripId)
+- **Phát lại sự kiện**: Khả năng xử lý lại các sự kiện lịch sử
+- **Consumer groups**: Nhiều instance tiêu thụ song song
 
-**Pros**:
+### Yêu cầu Phi chức năng
 
-- ✅ **High throughput**: Millions of messages/second capability
-- ✅ **Event sourcing**: Messages retained for configurable time (we use 24h-7days)
-- ✅ **Horizontal scaling**: Add brokers and partitions as needed
-- ✅ **Consumer groups**: Parallel processing with automatic load balancing
-- ✅ **Fault tolerance**: Replication across brokers
-- ✅ **Message ordering**: Guaranteed within partition
-- ✅ **Exactly-once semantics**: Available (though we use at-least-once)
-- ✅ **Battle-tested**: Used by Uber, LinkedIn, Netflix
-- ✅ **KRaft mode**: No ZooKeeper dependency in modern versions
+- **Throughput**: Xử lý 1000+ message/giây
+- **Độ trễ**: <100ms gửi sự kiện end-to-end
+- **Khả năng mở rộng**: Mở rộng theo chiều ngang cho producers và consumers
+- **Khả năng chịu lỗi**: Vượt qua lỗi broker mà không mất dữ liệu
+- **Độ phức tạp vận hành**: Quản lý được cho team nhỏ
 
-**Cons**:
+---
 
-- ❌ **Operational complexity**: More complex than SQS/SNS
-- ❌ **Resource intensive**: Requires dedicated broker instances
-- ❌ **Learning curve**: Team needs to learn Kafka concepts
-- ❌ **Overkill for small scale**: May be too much for <100 msg/s
+## Các Phương án Đã Xem xét
 
-**Architecture**:
+### Phương án 1: Apache Kafka (Nền tảng Event Streaming)
+
+**Mô tả**: Commit log phân tán được thiết kế cho event streaming thông lượng cao.
+
+**Ưu điểm**:
+
+- ✅ **Throughput cao**: Khả năng hàng triệu message/giây
+- ✅ **Event sourcing**: Message được lưu trữ trong thời gian có thể cấu hình (chúng ta dùng 24h-7 ngày)
+- ✅ **Mở rộng theo chiều ngang**: Thêm brokers và partitions khi cần
+- ✅ **Consumer groups**: Xử lý song song với cân bằng tải tự động
+- ✅ **Khả năng chịu lỗi**: Nhân bản giữa các brokers
+- ✅ **Thứ tự message**: Đảm bảo trong partition
+- ✅ **Exactly-once semantics**: Có sẵn (mặc dù chúng ta dùng at-least-once)
+- ✅ **Đã được kiểm chứng**: Được sử dụng bởi Uber, LinkedIn, Netflix
+- ✅ **KRaft mode**: Không phụ thuộc ZooKeeper trong các phiên bản hiện đại
+
+**Nhược điểm**:
+
+- ❌ **Độ phức tạp vận hành**: Phức tạp hơn SQS/SNS
+- ❌ **Tốn tài nguyên**: Yêu cầu các broker instance riêng biệt
+- ❌ **Learning curve**: Team cần học các khái niệm Kafka
+- ❌ **Quá mức cho quy mô nhỏ**: Có thể quá nhiều cho <100 msg/s
+
+**Kiến trúc**:
 
 ```
 ┌─────────────┐  produce   ┌──────────────┐
@@ -90,184 +90,184 @@ We needed to choose between:
               └───────────┘ └───────────┘ └───────────┘
 ```
 
-**Cost** (AWS MSK):
+**Chi phí** (AWS MSK):
 
-- 3 brokers (m5.large): ~$500/month
-- Storage (500GB): ~$50/month
-- **Total**: ~$550/month
+- 3 brokers (m5.large): ~$500/tháng
+- Storage (500GB): ~$50/tháng
+- **Tổng**: ~$550/tháng
 
-**Local Development**:
+**Phát triển Local**:
 
 - Docker image: confluentinc/cp-kafka
-- KRaft mode (no ZooKeeper needed)
-- Easy setup with docker-compose
+- KRaft mode (không cần ZooKeeper)
+- Cài đặt dễ dàng với docker-compose
 
 ---
 
-### Option 2: Direct HTTP/REST Calls
+### Phương án 2: Direct HTTP/REST Calls
 
-**Description**: Services communicate synchronously via REST APIs.
+**Mô tả**: Các dịch vụ giao tiếp đồng bộ qua REST APIs.
 
-**Pros**:
+**Ưu điểm**:
 
-- ✅ **Simple**: No additional infrastructure
-- ✅ **Immediate feedback**: Know if request succeeded
-- ✅ **Easy debugging**: Standard HTTP tools (cURL, Postman)
-- ✅ **No learning curve**: Team already knows REST
+- ✅ **Đơn giản**: Không cần hạ tầng bổ sung
+- ✅ **Phản hồi ngay lập tức**: Biết ngay nếu request thành công
+- ✅ **Dễ debug**: Công cụ HTTP chuẩn (cURL, Postman)
+- ✅ **Không cần học**: Team đã biết REST
 
-**Cons**:
+**Nhược điểm**:
 
-- ❌ **Tight coupling**: Services depend on each other's availability
-- ❌ **Cascading failures**: If Trip Service down, Driver Service can't notify
-- ❌ **No retry mechanism**: Caller must implement retries
-- ❌ **No event history**: Can't replay events
-- ❌ **Synchronous blocking**: Slow downstream service blocks upstream
-- ❌ **Circuit breaker needed**: Complex error handling
+- ❌ **Coupling chặt**: Các dịch vụ phụ thuộc vào sự sẵn sàng của nhau
+- ❌ **Cascading failures**: Nếu Trip Service down, Driver Service không thể thông báo
+- ❌ **Không có cơ chế retry**: Caller phải tự triển khai retries
+- ❌ **Không có lịch sử sự kiện**: Không thể phát lại events
+- ❌ **Đồng bộ blocking**: Dịch vụ downstream chậm chặn upstream
+- ❌ **Cần circuit breaker**: Xử lý lỗi phức tạp
 
-**Example Problem**:
+**Ví dụ Vấn đề**:
 
 ```
-Trip requested → Call Driver Service → Call Notification Service
-                      ↓ (fails)              ↓
-                   Retry?              Request lost
+Yêu cầu chuyến đi → Gọi Driver Service → Gọi Notification Service
+                      ↓ (thất bại)           ↓
+                   Retry?              Request mất
 ```
 
-**Why rejected**:
+**Lý do bị từ chối**:
 
-- Creates tight coupling between services
-- Can't scale independently
-- No fault tolerance built-in
+- Tạo coupling chặt giữa các dịch vụ
+- Không thể scale độc lập
+- Không có fault tolerance tích hợp
 
 ---
 
-### Option 3: AWS SQS/SNS
+### Phương án 3: AWS SQS/SNS
 
-**Description**: Managed message queue (SQS) and pub/sub (SNS) services.
+**Mô tả**: Dịch vụ message queue được quản lý (SQS) và pub/sub (SNS).
 
-**Pros**:
+**Ưu điểm**:
 
-- ✅ **Fully managed**: No server management
-- ✅ **Scalable**: Auto-scales automatically
-- ✅ **Reliable**: 99.9% availability SLA
-- ✅ **Simple**: Easy API, quick setup
-- ✅ **Pay-per-use**: Cost-effective at low volumes
+- ✅ **Fully managed**: Không cần quản lý server
+- ✅ **Khả năng mở rộng**: Tự động scale
+- ✅ **Đáng tin cậy**: 99.9% availability SLA
+- ✅ **Đơn giản**: API dễ dàng, cài đặt nhanh
+- ✅ **Pay-per-use**: Hiệu quả chi phí ở khối lượng thấp
 
-**Cons**:
+**Nhược điểm**:
 
-- ❌ **No message ordering**: Only FIFO queues (limited throughput)
-- ❌ **No event replay**: Messages deleted after consumption
-- ❌ **Limited retention**: Max 14 days (vs Kafka's configurable)
-- ❌ **Vendor lock-in**: AWS-specific, hard to migrate
-- ❌ **Message size limit**: 256KB max (Kafka: 1MB default)
-- ❌ **Eventual consistency**: Can have message duplication
-- ❌ **No partitioning**: Can't guarantee order for specific entities
+- ❌ **Không có thứ tự message**: Chỉ FIFO queues (throughput hạn chế)
+- ❌ **Không phát lại sự kiện**: Message bị xóa sau khi consume
+- ❌ **Retention hạn chế**: Tối đa 14 ngày (so với Kafka có thể cấu hình)
+- ❌ **Vendor lock-in**: Đặc thù AWS, khó migrate
+- ❌ **Giới hạn kích thước message**: Tối đa 256KB (Kafka: 1MB mặc định)
+- ❌ **Eventual consistency**: Có thể có message trùng lặp
+- ❌ **Không có partitioning**: Không thể đảm bảo thứ tự cho các entity cụ thể
 
-**Cost** (AWS):
+**Chi phí** (AWS):
 
 - 1M requests: $0.40
-- **Estimated**: ~$100/month for 10M events
+- **Ước tính**: ~$100/tháng cho 10M events
 
-**Why not chosen**:
+**Lý do không chọn**:
 
-- No message ordering (critical for trip lifecycle events)
-- Can't replay events (needed for debugging, analytics)
-- Vendor lock-in to AWS
-
----
-
-### Option 4: RabbitMQ
-
-**Description**: Traditional message broker with robust routing capabilities.
-
-**Pros**:
-
-- ✅ **Flexible routing**: Exchange types (direct, topic, fanout)
-- ✅ **Mature**: 15+ years in production
-- ✅ **Management UI**: Built-in admin dashboard
-- ✅ **Multiple protocols**: AMQP, MQTT, STOMP
-
-**Cons**:
-
-- ❌ **Lower throughput**: ~50K msg/s vs Kafka's millions
-- ❌ **Message deletion**: Removed after consumption (no replay)
-- ❌ **Vertical scaling**: Hard to scale horizontally
-- ❌ **Memory bound**: Performance degrades with large queues
-- ❌ **Single point of failure**: Need HA setup for redundancy
-
-**Why not chosen**:
-
-- Can't replay events (no event sourcing)
-- Lower throughput than Kafka
-- Not designed for event streaming use case
+- Không có thứ tự message (quan trọng cho các sự kiện vòng đời chuyến đi)
+- Không thể phát lại events (cần cho debugging, analytics)
+- Vendor lock-in vào AWS
 
 ---
 
-## Decision Outcome
+### Phương án 4: RabbitMQ
 
-**Chosen option: Option 1 - Apache Kafka**
+**Mô tả**: Message broker truyền thống với khả năng routing mạnh mẽ.
 
-### Rationale
+**Ưu điểm**:
 
-1. **Event sourcing**: Can replay events for debugging, analytics, new consumers
-2. **High throughput**: Handles 1000+ events/sec with room to grow
-3. **Horizontal scaling**: Add consumers without changing producers
-4. **Fault tolerance**: Messages replicated, survive broker failures
-5. **Message ordering**: Critical for trip lifecycle (requested → accepted → started → completed)
-6. **Industry standard**: Proven by Uber, Lyft in ride-hailing
+- ✅ **Routing linh hoạt**: Các loại exchange (direct, topic, fanout)
+- ✅ **Trưởng thành**: Hơn 15 năm trong production
+- ✅ **Management UI**: Dashboard admin tích hợp sẵn
+- ✅ **Nhiều giao thức**: AMQP, MQTT, STOMP
 
-### Architecture Decision
+**Nhược điểm**:
+
+- ❌ **Throughput thấp hơn**: ~50K msg/s so với hàng triệu của Kafka
+- ❌ **Xóa message**: Bị xóa sau khi consume (không phát lại được)
+- ❌ **Mở rộng theo chiều dọc**: Khó scale theo chiều ngang
+- ❌ **Memory bound**: Hiệu suất giảm với hàng đợi lớn
+- ❌ **Single point of failure**: Cần HA setup để dự phòng
+
+**Lý do không chọn**:
+
+- Không thể phát lại events (không có event sourcing)
+- Throughput thấp hơn Kafka
+- Không được thiết kế cho event streaming use case
+
+---
+
+## Quyết định Cuối cùng
+
+**Phương án được chọn: Phương án 1 - Apache Kafka**
+
+### Lý do
+
+1. **Event sourcing**: Có thể phát lại events cho debugging, analytics, consumers mới
+2. **Throughput cao**: Xử lý 1000+ events/giây với khả năng tăng trưởng
+3. **Mở rộng theo chiều ngang**: Thêm consumers mà không cần thay đổi producers
+4. **Khả năng chịu lỗi**: Message được nhân bản, vượt qua lỗi broker
+5. **Thứ tự message**: Quan trọng cho vòng đời chuyến đi (requested → accepted → started → completed)
+6. **Tiêu chuẩn ngành**: Đã được chứng minh bởi Uber, Lyft trong gọi xe
+
+### Quyết định Kiến trúc
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Kafka Topics Design                      │
+│                    Thiết kế Kafka Topics                    │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  Topic: trip.requested (3 partitions)                       │
 │  Producer: Trip Service                                     │
-│  Consumers: Driver Service (notify nearby drivers)          │
-│  Retention: 24 hours                                        │
-│  Key: tripId (ensures order per trip)                       │
+│  Consumers: Driver Service (thông báo tài xế gần đó)        │
+│  Retention: 24 giờ                                          │
+│  Key: tripId (đảm bảo thứ tự cho mỗi chuyến đi)             │
 │                                                              │
 │  Topic: trip.accepted (3 partitions)                        │
 │  Producer: Driver Service                                   │
-│  Consumers: Trip Service (update trip status)               │
-│  Retention: 24 hours                                        │
+│  Consumers: Trip Service (cập nhật trạng thái chuyến đi)    │
+│  Retention: 24 giờ                                          │
 │                                                              │
 │  Topic: driver.location.updated (6 partitions)              │
 │  Producer: Driver Service                                   │
-│  Consumers: Trip Service (real-time tracking)               │
-│  Retention: 1 hour (high volume, short-lived)               │
+│  Consumers: Trip Service (theo dõi thời gian thực)          │
+│  Retention: 1 giờ (khối lượng cao, tồn tại ngắn)            │
 │  Key: driverId                                              │
 │                                                              │
 │  Topic: trip.completed (3 partitions)                       │
 │  Producer: Driver Service                                   │
 │  Consumers: Trip Service, Billing Service                   │
-│  Retention: 7 days (for billing reconciliation)             │
+│  Retention: 7 ngày (cho đối soát thanh toán)                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Trade-offs Accepted
+### Đánh đổi Được chấp nhận
 
-**Increased Complexity**:
+**Độ phức tạp Tăng lên**:
 
-- **Accepted**: Team invests time learning Kafka concepts
-- **Mitigation**: Comprehensive documentation, shared Kafka client library
+- **Chấp nhận**: Team đầu tư thời gian học các khái niệm Kafka
+- **Giảm thiểu**: Tài liệu toàn diện, thư viện Kafka client được chia sẻ
 
-**Operational Overhead**:
+**Overhead Vận hành**:
 
-- **Accepted**: Need to monitor Kafka brokers, consumer lag
-- **Mitigation**: Use AWS MSK (managed Kafka) in production, simple Docker setup locally
+- **Chấp nhận**: Cần giám sát Kafka brokers, consumer lag
+- **Giảm thiểu**: Sử dụng AWS MSK (managed Kafka) trong production, cài đặt Docker đơn giản ở local
 
-**Resource Usage**:
+**Sử dụng Tài nguyên**:
 
-- **Accepted**: Kafka requires dedicated resources (CPU, memory, disk)
-- **Mitigation**: Cost is justified by throughput and reliability gains
+- **Chấp nhận**: Kafka yêu cầu tài nguyên riêng biệt (CPU, memory, disk)
+- **Giảm thiểu**: Chi phí được biện minh bởi throughput và reliability
 
 ---
 
-## Implementation Details
+## Chi tiết Triển khai
 
-### Kafka Setup (KRaft Mode, No ZooKeeper)
+### Cài đặt Kafka (KRaft Mode, Không cần ZooKeeper)
 
 ```yaml
 # docker-compose.yaml
@@ -279,11 +279,11 @@ kafka:
     KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
     KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-    KAFKA_LOG_RETENTION_MS: 86400000 # 24 hours
+    KAFKA_LOG_RETENTION_MS: 86400000 # 24 giờ
     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 ```
 
-### Shared Kafka Client Library
+### Thư viện Kafka Client Được chia sẻ
 
 ```javascript
 // common/shared/kafkaClient.js
@@ -291,10 +291,10 @@ class KafkaClient {
   async initProducer(options = {}) {
     this.producer = this.kafka.producer({
       maxInFlightRequests: 5,
-      idempotent: false, // For PoC, prioritize performance
+      idempotent: false, // Cho PoC, ưu tiên hiệu suất
       batch: {
-        size: 100, // Batch up to 100 messages
-        timeout: 50, // or wait max 50ms
+        size: 100, // Batch tối đa 100 messages
+        timeout: 50, // hoặc đợi tối đa 50ms
       },
       compression: "gzip",
       ...options,
@@ -315,7 +315,7 @@ class KafkaClient {
 }
 ```
 
-### Event Schema Standardization
+### Chuẩn hóa Event Schema
 
 ```javascript
 // common/shared/eventSchemas.js
@@ -328,7 +328,7 @@ const TripRequestedEvent = {
     tripId: "trip_123",
     passengerId: "user_456",
     pickup: { lat: 10.762622, lng: 106.660172, address: "UIT" },
-    dropoff: { lat: 10.772622, lng: 106.670172, address: "District 1" },
+    dropoff: { lat: 10.772622, lng: 106.670172, address: "Quận 1" },
     estimatedFare: 50000,
     vehicleType: "sedan",
   },
@@ -339,7 +339,7 @@ const TripRequestedEvent = {
 };
 ```
 
-### Producer Example (Trip Service)
+### Ví dụ Producer (Trip Service)
 
 ```javascript
 // services/trip-service/src/services/tripEventProducer.js
@@ -353,7 +353,7 @@ class TripEventProducer {
     };
 
     await kafkaClient.sendMessage("trip.requested", {
-      key: tripData.tripId, // Partition by tripId for ordering
+      key: tripData.tripId, // Partition theo tripId để đảm bảo thứ tự
       value: JSON.stringify(event),
       headers: {
         "event-type": "trip.requested",
@@ -366,7 +366,7 @@ class TripEventProducer {
 }
 ```
 
-### Consumer Example (Driver Service)
+### Ví dụ Consumer (Driver Service)
 
 ```javascript
 // services/driver-service/src/services/tripEventConsumer.js
@@ -383,21 +383,21 @@ class TripEventConsumer {
         }
       } catch (error) {
         logger.error("Failed to process event", { error, event });
-        // Message will be retried or sent to DLQ
+        // Message sẽ được retry hoặc gửi đến DLQ
         throw error;
       }
     });
   }
 
   async handleTripRequested(tripData) {
-    // Find nearby drivers
+    // Tìm tài xế gần đó
     const drivers = await locationService.findNearbyDrivers(
       tripData.pickup.lat,
       tripData.pickup.lng,
-      5 // 5km radius
+      5 // bán kính 5km
     );
 
-    // Notify drivers via WebSocket
+    // Thông báo cho tài xế qua WebSocket
     for (const driver of drivers) {
       await notificationService.sendTripRequest(driver.id, tripData);
     }
@@ -407,148 +407,148 @@ class TripEventConsumer {
 
 ---
 
-## Validation & Results
+## Kiểm chứng & Kết quả
 
 ### Load Testing
 
-**Scenario**: Simulate 500 trips being requested simultaneously
+**Kịch bản**: Mô phỏng 500 chuyến đi được yêu cầu đồng thời
 
 ```
-Setup:
-- 500 virtual users
-- Each creates a trip (produces event)
-- Driver service consumes events
-- Duration: 2 minutes
+Thiết lập:
+- 500 người dùng ảo
+- Mỗi người tạo một chuyến đi (produce event)
+- Driver service consume events
+- Thời lượng: 2 phút
 
-Results:
-✅ Kafka produced: 500 events in 2.3 seconds (217 events/sec)
-✅ Consumer lag: <100ms average
+Kết quả:
+✅ Kafka produced: 500 events trong 2.3 giây (217 events/giây)
+✅ Consumer lag: <100ms trung bình
 ✅ P95 end-to-end latency: 85ms
-✅ Zero message loss
-✅ Consumer group rebalancing: <3 seconds
+✅ Không mất message
+✅ Consumer group rebalancing: <3 giây
 ✅ Broker CPU usage: 15%
 ✅ Broker memory usage: 450MB
 ```
 
-### Event Flow Trace
+### Trace Luồng Sự kiện
 
 ```
-13:45:23.100 - Trip Service: Passenger creates trip
-13:45:23.105 - Trip Service: Published trip.requested to Kafka
-13:45:23.125 - Kafka: Event written to partition 1
+13:45:23.100 - Trip Service: Hành khách tạo chuyến đi
+13:45:23.105 - Trip Service: Published trip.requested lên Kafka
+13:45:23.125 - Kafka: Event được ghi vào partition 1
 13:45:23.140 - Driver Service: Consumed trip.requested
-13:45:23.142 - Driver Service: Query Redis for nearby drivers (5ms)
-13:45:23.150 - Driver Service: Send notifications to 3 drivers
-13:45:23.180 - Driver App: Receives trip request (total: 80ms)
+13:45:23.142 - Driver Service: Query Redis tìm tài xế gần (5ms)
+13:45:23.150 - Driver Service: Gửi thông báo đến 3 tài xế
+13:45:23.180 - Driver App: Nhận yêu cầu chuyến đi (tổng: 80ms)
 ```
 
 ---
 
-## Consequences
+## Hậu quả
 
-### Positive
+### Tích cực
 
-- ✅ **Loose coupling**: Services don't know about each other
+- ✅ **Coupling lỏng**: Các dịch vụ không biết về nhau
 
   ```
   Trip Service → Kafka ← Driver Service
-  (no direct dependency)
+  (không phụ thuộc trực tiếp)
   ```
 
-- ✅ **Horizontal scaling**: Add more consumer instances
+- ✅ **Mở rộng theo chiều ngang**: Thêm nhiều consumer instances
 
   ```
-  Before: 1 consumer, 100 events/sec
-  After: 3 consumers, 300 events/sec (linear scaling)
+  Trước: 1 consumer, 100 events/giây
+  Sau: 3 consumers, 300 events/giây (scaling tuyến tính)
   ```
 
-- ✅ **Fault tolerance**: Message not lost if consumer crashes
+- ✅ **Khả năng chịu lỗi**: Message không mất nếu consumer crash
 
   ```
-  Consumer crashes → Message stays in Kafka → Consumed by another instance
+  Consumer crashes → Message vẫn ở trong Kafka → Consumed bởi instance khác
   ```
 
-- ✅ **Event replay**: Debug production issues by replaying events
+- ✅ **Phát lại sự kiện**: Debug vấn đề production bằng cách replay events
 
   ```bash
-  # Replay last hour of events
+  # Replay events giờ cuối
   kafka-consumer --topic trip.requested --from-beginning --max-messages 1000
   ```
 
-- ✅ **Audit trail**: All business events logged for compliance
+- ✅ **Audit trail**: Tất cả sự kiện nghiệp vụ được log để tuân thủ
 
-### Negative
+### Tiêu cực
 
-- ⚠️ **Eventual consistency**: Events processed asynchronously
+- ⚠️ **Eventual consistency**: Events được xử lý bất đồng bộ
 
-  - Trip created in Trip Service → Driver notified 50-100ms later
-  - **Acceptable**: User doesn't notice <100ms delay
+  - Chuyến đi được tạo trong Trip Service → Tài xế được thông báo 50-100ms sau
+  - **Chấp nhận được**: Người dùng không nhận ra độ trễ <100ms
 
-- ⚠️ **Monitoring complexity**: Need to track consumer lag, broker health
+- ⚠️ **Độ phức tạp giám sát**: Cần theo dõi consumer lag, broker health
 
-  - **Mitigation**: Kafka Manager UI, CloudWatch metrics
+  - **Giảm thiểu**: Kafka Manager UI, CloudWatch metrics
 
-- ⚠️ **Debugging distributed flows**: Harder to trace requests
-  - **Mitigation**: Correlation IDs in all events, centralized logging
+- ⚠️ **Debug distributed flows**: Khó trace requests hơn
+  - **Giảm thiểu**: Correlation IDs trong tất cả events, centralized logging
 
-### Risks & Mitigation
+### Rủi ro & Giảm thiểu
 
-| Risk                               | Likelihood | Impact | Mitigation                                 |
-| ---------------------------------- | ---------- | ------ | ------------------------------------------ |
-| **Consumer falls behind**          | Medium     | High   | Monitor consumer lag, auto-scale consumers |
-| **Kafka broker failure**           | Low        | High   | Use 3 brokers with replication factor 2    |
-| **Message duplication**            | Medium     | Low    | Idempotent event handlers (use event IDs)  |
-| **Schema changes break consumers** | Medium     | Medium | Event versioning (eventVersion field)      |
+| Rủi ro                               | Khả năng | Tác động | Giảm thiểu                                  |
+| ------------------------------------ | -------- | -------- | ------------------------------------------- |
+| **Consumer bị tụt lại phía sau**     | Trung    | Cao      | Giám sát consumer lag, auto-scale consumers |
+| **Kafka broker failure**             | Thấp     | Cao      | Dùng 3 brokers với replication factor 2     |
+| **Message trùng lặp**                | Trung    | Thấp     | Idempotent event handlers (dùng event IDs)  |
+| **Thay đổi schema phá vỡ consumers** | Trung    | Trung    | Event versioning (trường eventVersion)      |
 
 ---
 
-## Monitoring & Observability
+## Giám sát & Khả năng Quan sát
 
-### Key Metrics to Monitor
+### Các Chỉ số Chính cần Giám sát
 
 ```
 Producer Metrics:
-- Record send rate (target: >100/sec)
-- Record error rate (target: <0.1%)
-- Batch size (target: 50-100 records/batch)
+- Tốc độ gửi record (mục tiêu: >100/giây)
+- Tỷ lệ lỗi record (mục tiêu: <0.1%)
+- Kích thước batch (mục tiêu: 50-100 records/batch)
 
 Consumer Metrics:
-- Consumer lag (target: <100 messages)
-- Fetch rate (target: >50/sec per consumer)
-- Processing time (target: <50ms per event)
+- Consumer lag (mục tiêu: <100 messages)
+- Tốc độ fetch (mục tiêu: >50/giây cho mỗi consumer)
+- Thời gian xử lý (mục tiêu: <50ms cho mỗi event)
 
 Broker Metrics:
-- CPU usage (target: <70%)
-- Disk usage (target: <80%)
-- Network throughput (target: <80% capacity)
+- CPU usage (mục tiêu: <70%)
+- Disk usage (mục tiêu: <80%)
+- Network throughput (mục tiêu: <80% capacity)
 ```
 
-### Alerting Rules
+### Quy tắc Cảnh báo
 
 ```yaml
-# Consumer lag alert
+# Cảnh báo consumer lag cao
 - alert: ConsumerLagHigh
   expr: kafka_consumer_lag > 1000
   for: 5m
   annotations:
-    summary: "Consumer {{ $labels.group }} is lagging"
+    summary: "Consumer {{ $labels.group }} đang bị tụt lại"
 
-# Broker down alert
+# Cảnh báo broker down
 - alert: KafkaBrokerDown
   expr: up{job="kafka"} == 0
   for: 1m
   annotations:
-    summary: "Kafka broker {{ $labels.instance }} is down"
+    summary: "Kafka broker {{ $labels.instance }} đang down"
 ```
 
 ---
 
-## Future Enhancements
+## Cải tiến Tương lai
 
-### Phase 2: Stream Processing with Kafka Streams
+### Giai đoạn 2: Stream Processing với Kafka Streams
 
 ```javascript
-// Real-time analytics on event stream
+// Real-time analytics trên event stream
 const stream = kafka
   .streams()
   .from("trip.completed")
@@ -561,10 +561,10 @@ const stream = kafka
   .to("analytics.hourly_revenue");
 ```
 
-### Phase 3: CQRS with Event Sourcing
+### Giai đoạn 3: CQRS với Event Sourcing
 
 ```javascript
-// Rebuild trip state from events
+// Rebuild trạng thái chuyến đi từ events
 async function rebuildTripState(tripId) {
   const events = await kafka.readEvents("trip.*", { key: tripId });
 
@@ -578,52 +578,52 @@ async function rebuildTripState(tripId) {
 
 ---
 
-## Alternatives for Specific Use Cases
+## Các Phương án thay thế cho Use Cases Cụ thể
 
-### When to use REST instead of Kafka:
+### Khi nào dùng REST thay vì Kafka:
 
-- **Immediate response needed**: Payment processing, auth
-- **Simple request-reply**: Get user profile, check driver availability
-- **Low latency critical**: <10ms requirement
+- **Cần phản hồi ngay lập tức**: Xử lý thanh toán, xác thực
+- **Request-reply đơn giản**: Lấy profile người dùng, kiểm tra tài xế có sẵn
+- **Độ trễ thấp quan trọng**: Yêu cầu <10ms
 
-### When to use SQS/SNS:
+### Khi nào dùng SQS/SNS:
 
-- **Low volume**: <100 messages/sec
-- **Don't need event replay**: Fire-and-forget notifications
-- **Minimal ops**: Fully managed, no maintenance
+- **Khối lượng thấp**: <100 messages/giây
+- **Không cần phát lại event**: Thông báo fire-and-forget
+- **Ops tối thiểu**: Fully managed, không bảo trì
 
-### When to use RabbitMQ:
+### Khi nào dùng RabbitMQ:
 
-- **Complex routing**: Topic exchanges, header-based routing
-- **RPC patterns**: Request-reply with correlation IDs
-- **Legacy integration**: AMQP protocol required
+- **Routing phức tạp**: Topic exchanges, header-based routing
+- **RPC patterns**: Request-reply với correlation IDs
+- **Tích hợp legacy**: Yêu cầu giao thức AMQP
 
 ---
 
-## Follow-up Actions
+## Các Hành động Tiếp theo
 
-- [x] Setup Kafka in docker-compose (2025-10-16)
-- [x] Create shared Kafka client library (2025-10-17)
-- [x] Implement trip lifecycle events (2025-10-18)
-- [x] Add consumer lag monitoring (2025-10-19)
+- [x] Cài đặt Kafka trong docker-compose (2025-10-16)
+- [x] Tạo thư viện Kafka client được chia sẻ (2025-10-17)
+- [x] Triển khai trip lifecycle events (2025-10-18)
+- [x] Thêm giám sát consumer lag (2025-10-19)
 - [x] Load test event throughput (2025-10-20)
-- [ ] Setup AWS MSK in staging (2025-11-01)
-- [ ] Implement dead letter queue (2025-11-05)
-- [ ] Document event schemas in wiki (2025-11-10)
+- [ ] Cài đặt AWS MSK trong staging (2025-11-01)
+- [ ] Triển khai dead letter queue (2025-11-05)
+- [ ] Tài liệu hóa event schemas trong wiki (2025-11-10)
 
 ---
 
-## References
+## Tài liệu Tham khảo
 
 - [Apache Kafka Documentation](https://kafka.apache.org/documentation/)
 - [Kafka: The Definitive Guide](https://www.confluent.io/resources/kafka-the-definitive-guide/)
 - [Uber's Event-Driven Architecture](https://eng.uber.com/microservice-architecture/)
 - [AWS MSK Best Practices](https://docs.aws.amazon.com/msk/latest/developerguide/bestpractices.html)
-- Load Test Results: `test/load-tests/STRESS_TEST_REPORT.md`
+- Kết quả Load Test: `test/load-tests/STRESS_TEST_REPORT.md`
 - Event Schemas: `common/shared/eventSchemas.js`
 
 ---
 
 **Reviewed by**: Architecture Team  
 **Approved by**: Tech Lead  
-**Next Review**: 2025-12-01 (after 1 month in production)
+**Next Review**: 2025-12-01 (sau 1 tháng trong production)

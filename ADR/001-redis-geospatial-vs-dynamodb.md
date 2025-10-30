@@ -1,80 +1,80 @@
-# ADR 001: Use Redis for Geospatial Indexing Instead of DynamoDB
+# ADR 001: Sử dụng Redis cho Geospatial Indexing thay vì DynamoDB
 
-**Status**: Accepted  
-**Date**: 2025-10-15  
-**Deciders**: Technical Architecture Team  
+**Trạng thái**: Đã chấp nhận  
+**Ngày**: 2025-10-15  
+**Người quyết định**: Nhóm Kiến trúc Kỹ thuật  
 **Tags**: `database`, `caching`, `geospatial`, `performance`
 
 ---
 
-## Context and Problem Statement
+## Bối cảnh và Vấn đề
 
-The Driver Service needs to efficiently query nearby drivers based on passenger pickup location. This operation is critical to the ride-hailing business and must:
+Driver Service cần truy vấn hiệu quả các tài xế gần đó dựa trên vị trí đón khách. Hoạt động này rất quan trọng đối với nghiệp vụ gọi xe và phải:
 
-- Return results in **<10ms** for optimal user experience
-- Support **geospatial queries** (find all drivers within radius)
-- Handle **frequent location updates** (every 5 seconds per active driver)
-- Scale to **10,000+ active drivers** simultaneously
+- Trả về kết quả trong **<10ms** để có trải nghiệm người dùng tối ưu
+- Hỗ trợ **truy vấn không gian địa lý** (tìm tất cả tài xế trong bán kính)
+- Xử lý **cập nhật vị trí thường xuyên** (mỗi 5 giây cho mỗi tài xế đang hoạt động)
+- Mở rộng đến **10.000+ tài xế hoạt động** đồng thời
 
-We needed to choose between:
+Chúng ta cần lựa chọn giữa:
 
-1. **Redis** with built-in geospatial commands
-2. **Amazon DynamoDB** with custom geospatial implementation
-
----
-
-## Decision Drivers
-
-### Functional Requirements
-
-- **Geospatial querying**: GEORADIUS, GEORADIUSBYMEMBER operations
-- **Real-time updates**: Frequent writes (driver location updates)
-- **Low latency reads**: Critical for matching algorithm performance
-- **In-memory performance**: Sub-10ms query response time
-
-### Non-Functional Requirements
-
-- **Scalability**: Handle 10K+ concurrent drivers, 500+ req/s
-- **Cost efficiency**: Minimize operational costs for PoC
-- **Development velocity**: Easy integration, well-documented
-- **Operational complexity**: Minimize maintenance overhead
+1. **Redis** với các lệnh geospatial tích hợp sẵn
+2. **Amazon DynamoDB** với triển khai geospatial tùy chỉnh
 
 ---
 
-## Considered Options
+## Yếu tố Quyết định
 
-### Option 1: Redis with Geospatial Data Structures
+### Yêu cầu Chức năng
 
-**Description**: Use Redis built-in geospatial commands (GEOADD, GEORADIUS) with sorted sets.
+- **Truy vấn không gian địa lý**: Các thao tác GEORADIUS, GEORADIUSBYMEMBER
+- **Cập nhật thời gian thực**: Ghi dữ liệu thường xuyên (cập nhật vị trí tài xế)
+- **Đọc độ trễ thấp**: Quan trọng cho hiệu suất thuật toán ghép đôi
+- **Hiệu suất in-memory**: Thời gian phản hồi truy vấn dưới 10ms
 
-**Pros**:
+### Yêu cầu Phi chức năng
 
-- ✅ **Native geospatial support**: Built-in GEORADIUS command, no custom logic needed
-- ✅ **Sub-millisecond latency**: In-memory operations, typically 2-5ms
-- ✅ **Simple API**:
+- **Khả năng mở rộng**: Xử lý 10K+ tài xế đồng thời, 500+ req/s
+- **Hiệu quả chi phí**: Giảm thiểu chi phí vận hành cho PoC
+- **Tốc độ phát triển**: Tích hợp dễ dàng, tài liệu đầy đủ
+- **Độ phức tạp vận hành**: Giảm thiểu công việc bảo trì
+
+---
+
+## Các Phương án Đã Xem xét
+
+### Phương án 1: Redis với Cấu trúc Dữ liệu Không gian Địa lý
+
+**Mô tả**: Sử dụng các lệnh geospatial tích hợp sẵn của Redis (GEOADD, GEORADIUS) với sorted sets.
+
+**Ưu điểm**:
+
+- ✅ **Hỗ trợ geospatial tự nhiên**: Lệnh GEORADIUS tích hợp sẵn, không cần logic tùy chỉnh
+- ✅ **Độ trễ dưới millisecond**: Thao tác trên bộ nhớ, thường 2-5ms
+- ✅ **API đơn giản**:
   ```redis
   GEOADD driver_locations 106.660172 10.762622 driver_001
   GEORADIUS driver_locations 106.660 10.762 5 KM WITHDIST COUNT 10
   ```
-- ✅ **Battle-tested**: Used by Uber, Lyft for similar use cases
-- ✅ **Docker-friendly**: Easy local development setup
-- ✅ **Low cost**: Open-source, AWS ElastiCache affordable
-- ✅ **Pub/Sub**: Bonus feature for real-time notifications
+- ✅ **Đã được kiểm chứng**: Được sử dụng bởi Uber, Lyft cho các trường hợp tương tự
+- ✅ **Thân thiện với Docker**: Dễ dàng cài đặt môi trường phát triển local
+- ✅ **Chi phí thấp**: Mã nguồn mở, AWS ElastiCache giá cả phải chăng
+- ✅ **Pub/Sub**: Tính năng bổ sung cho thông báo thời gian thực
 
-**Cons**:
+**Nhược điểm**:
 
-- ❌ **In-memory only**: Data loss on crash (mitigated by persistence)
-- ❌ **Single-threaded**: Limited CPU usage (mitigated by clustering)
-- ❌ **Memory limits**: Need to manage eviction policies
-- ❌ **Not queryable**: Can't run complex queries like SQL
+- ❌ **Chỉ trên bộ nhớ**: Mất dữ liệu khi crash (được giảm thiểu bằng persistence)
+- ❌ **Single-threaded**: Sử dụng CPU hạn chế (được giảm thiểu bằng clustering)
+- ❌ **Giới hạn bộ nhớ**: Cần quản lý chính sách eviction
+- ❌ **Không thể truy vấn phức tạp**: Không thể chạy truy vấn phức tạp như SQL
 
-**Technical Implementation**:
+**Triển khai Kỹ thuật**:
 
 ```javascript
-// Add driver location
+// Thêm vị trí tài xế
 await redis.geoadd("driver_locations", longitude, latitude, driverId);
 
-// Find nearby drivers within 5km
+// Tìm tài xế gần trong bán kính 5km
 const nearby = await redis.georadius(
   "driver_locations",
   passengerLng,
@@ -88,41 +88,41 @@ const nearby = await redis.georadius(
 );
 ```
 
-**Performance Benchmark** (measured):
+**Benchmark Hiệu suất** (đã đo):
 
-- Write (GEOADD): 0.5ms average
-- Read (GEORADIUS): 4.8ms average for 10,000 drivers
-- Throughput: 100,000+ ops/sec on single instance
+- Ghi (GEOADD): 0.5ms trung bình
+- Đọc (GEORADIUS): 4.8ms trung bình cho 10,000 tài xế
+- Throughput: 100,000+ ops/sec trên một instance
 
 ---
 
-### Option 2: Amazon DynamoDB with Geohash
+### Phương án 2: Amazon DynamoDB với Geohash
 
-**Description**: Store driver locations in DynamoDB with geohash indexing for spatial queries.
+**Mô tả**: Lưu trữ vị trí tài xế trong DynamoDB với geohash indexing cho truy vấn không gian.
 
-**Pros**:
+**Ưu điểm**:
 
-- ✅ **Fully managed**: No server maintenance required
-- ✅ **Scalable**: Auto-scaling built-in
-- ✅ **Persistent**: Data durability guaranteed
-- ✅ **Global tables**: Multi-region replication
+- ✅ **Fully managed**: Không cần bảo trì server
+- ✅ **Khả năng mở rộng**: Auto-scaling tích hợp sẵn
+- ✅ **Lưu trữ lâu dài**: Đảm bảo độ bền dữ liệu
+- ✅ **Global tables**: Nhân bản đa vùng
 
-**Cons**:
+**Nhược điểm**:
 
-- ❌ **No native geospatial**: Must implement geohash manually
-- ❌ **Higher latency**: 10-50ms typical query time
-- ❌ **Complex queries**: Multiple table scans for radius search
-- ❌ **Cost**: Expensive for high read/write workload
-  - Write: $1.25 per million WCUs
-  - Read: $0.25 per million RCUs
-  - **Estimated cost**: $500-800/month for 10K drivers updating every 5s
-- ❌ **Development overhead**: Custom geohash library, complex indexing
-- ❌ **Vendor lock-in**: AWS-specific, harder to migrate
+- ❌ **Không có geospatial tự nhiên**: Phải triển khai geohash thủ công
+- ❌ **Độ trễ cao hơn**: Thời gian truy vấn thường 10-50ms
+- ❌ **Truy vấn phức tạp**: Nhiều lần quét bảng cho tìm kiếm bán kính
+- ❌ **Chi phí**: Đắt đỏ cho khối lượng đọc/ghi cao
+  - Ghi: $1.25 cho mỗi triệu WCUs
+  - Đọc: $0.25 cho mỗi triệu RCUs
+  - **Chi phí ước tính**: $500-800/tháng cho 10K tài xế cập nhật mỗi 5s
+- ❌ **Overhead phát triển**: Thư viện geohash tùy chỉnh, indexing phức tạp
+- ❌ **Vendor lock-in**: Đặc thù AWS, khó di chuyển
 
-**Technical Implementation**:
+**Triển khai Kỹ thuật**:
 
 ```javascript
-// Pseudo-code for DynamoDB geospatial
+// Pseudo-code cho DynamoDB geospatial
 const geohash = encodeGeohash(lat, lng, (precision = 6));
 await dynamoDB.putItem({
   TableName: "DriverLocations",
@@ -135,7 +135,7 @@ await dynamoDB.putItem({
   },
 });
 
-// Query requires multiple geohash prefixes
+// Truy vấn yêu cầu nhiều geohash prefix
 const neighbors = getNeighborGeohashes(userGeohash);
 const queries = neighbors.map((gh) =>
   dynamoDB.query({
@@ -145,72 +145,72 @@ const queries = neighbors.map((gh) =>
   })
 );
 const results = await Promise.all(queries);
-// Then filter by actual distance (haversine formula)
+// Sau đó lọc theo khoảng cách thực tế (công thức haversine)
 ```
 
-**Performance Benchmark** (estimated):
+**Benchmark Hiệu suất** (ước tính):
 
-- Write: 15-30ms
-- Read (geohash query): 25-60ms
-- Throughput: 3,000 ops/sec per table (requires scaling)
-
----
-
-### Option 3: PostgreSQL with PostGIS Extension
-
-**Description**: Use PostgreSQL with PostGIS for advanced geospatial queries.
-
-**Pros**:
-
-- ✅ **Robust geospatial**: Full GIS capabilities, complex spatial queries
-- ✅ **ACID compliance**: Strong consistency guarantees
-- ✅ **Relational data**: Can join with other tables
-- ✅ **Open source**: No vendor lock-in
-
-**Cons**:
-
-- ❌ **Slower than Redis**: 20-100ms query times
-- ❌ **Complex setup**: PostGIS extension, spatial indexes
-- ❌ **Operational overhead**: Need to manage DB, backups, scaling
-- ❌ **Overkill**: Too heavy for simple radius queries
-- ❌ **Not in-memory**: Disk-based, slower reads
+- Ghi: 15-30ms
+- Đọc (truy vấn geohash): 25-60ms
+- Throughput: 3,000 ops/sec cho mỗi bảng (cần scaling)
 
 ---
 
-## Decision Outcome
+### Phương án 3: PostgreSQL với PostGIS Extension
 
-**Chosen option: Option 1 - Redis with Geospatial Commands**
+**Mô tả**: Sử dụng PostgreSQL với PostGIS cho truy vấn không gian địa lý nâng cao.
 
-### Rationale
+**Ưu điểm**:
 
-1. **Performance**: Redis meets our <10ms requirement (measured 4.8ms avg)
-2. **Simplicity**: Native GEORADIUS command, minimal code
-3. **Cost**: ~$30/month ElastiCache vs $500+/month DynamoDB
-4. **Development speed**: Quick integration, well-documented
-5. **Proven**: Battle-tested by Uber, Lyft in production
+- ✅ **Geospatial mạnh mẽ**: Khả năng GIS đầy đủ, truy vấn không gian phức tạp
+- ✅ **Tuân thủ ACID**: Đảm bảo tính nhất quán mạnh mẽ
+- ✅ **Dữ liệu quan hệ**: Có thể join với các bảng khác
+- ✅ **Mã nguồn mở**: Không bị vendor lock-in
 
-### Trade-offs Accepted
+**Nhược điểm**:
 
-- **Data persistence risk**: Mitigated by:
+- ❌ **Chậm hơn Redis**: Thời gian truy vấn 20-100ms
+- ❌ **Cài đặt phức tạp**: PostGIS extension, spatial indexes
+- ❌ **Overhead vận hành**: Cần quản lý DB, backups, scaling
+- ❌ **Quá mức cần thiết**: Quá nặng cho truy vấn bán kính đơn giản
+- ❌ **Không in-memory**: Dựa trên đĩa, đọc chậm hơn
+
+---
+
+## Quyết định Cuối cùng
+
+**Phương án được chọn: Phương án 1 - Redis với Lệnh Geospatial**
+
+### Lý do
+
+1. **Hiệu suất**: Redis đáp ứng yêu cầu <10ms của chúng ta (đo được 4.8ms trung bình)
+2. **Đơn giản**: Lệnh GEORADIUS tự nhiên, code tối thiểu
+3. **Chi phí**: ~$30/tháng ElastiCache so với $500+/tháng DynamoDB
+4. **Tốc độ phát triển**: Tích hợp nhanh, tài liệu đầy đủ
+5. **Đã được chứng minh**: Được kiểm chứng bởi Uber, Lyft trong production
+
+### Đánh đổi Được chấp nhận
+
+- **Rủi ro lưu trữ dữ liệu**: Được giảm thiểu bằng:
   - Redis persistence (RDB snapshots + AOF logs)
-  - Primary data still in MongoDB
-  - Redis acts as "hot cache" for active drivers
-- **Single-point of failure**: Mitigated by:
+  - Dữ liệu chính vẫn trong MongoDB
+  - Redis hoạt động như "hot cache" cho các tài xế đang hoạt động
+- **Single-point of failure**: Được giảm thiểu bằng:
 
-  - Redis Cluster in production (multi-master)
-  - Automatic failover with Sentinel
-  - ElastiCache Multi-AZ deployment on AWS
+  - Redis Cluster trong production (multi-master)
+  - Automatic failover với Sentinel
+  - ElastiCache Multi-AZ deployment trên AWS
 
-- **Memory limits**: Mitigated by:
-  - TTL on inactive drivers (auto-evict after 10 min offline)
-  - LRU eviction policy
-  - Projected memory: 10K drivers × 100 bytes = ~1MB (negligible)
+- **Giới hạn bộ nhớ**: Được giảm thiểu bằng:
+  - TTL trên các tài xế không hoạt động (tự động xóa sau 10 phút offline)
+  - Chính sách eviction LRU
+  - Bộ nhớ dự kiến: 10K tài xế × 100 bytes = ~1MB (không đáng kể)
 
 ---
 
-## Implementation Details
+## Chi tiết Triển khai
 
-### Redis Configuration (Optimized for Geospatial)
+### Cấu hình Redis (Tối ưu cho Geospatial)
 
 ```conf
 # redis.conf
@@ -229,13 +229,13 @@ save 300 10
 
 class LocationService {
   async updateLocation(driverId, latitude, longitude) {
-    // Update geospatial index
+    // Cập nhật geospatial index
     await redis.geoadd("driver_locations", longitude, latitude, driverId);
 
-    // Set TTL for auto-cleanup (10 minutes)
+    // Đặt TTL để tự động dọn dẹp (10 phút)
     await redis.expire(`driver:status:${driverId}`, 600);
 
-    // Also update MongoDB for persistence
+    // Cũng cập nhật MongoDB để lưu trữ lâu dài
     await Driver.updateOne(
       { _id: driverId },
       {
@@ -259,7 +259,7 @@ class LocationService {
       limit
     );
 
-    // Filter by online status
+    // Lọc theo trạng thái online
     const online = await this.filterOnlineDrivers(nearbyDrivers);
     return online;
   }
@@ -268,113 +268,113 @@ class LocationService {
 
 ---
 
-## Validation & Results
+## Kiểm chứng & Kết quả
 
-### Load Testing Results
+### Kết quả Load Testing
 
-**Test Setup**: k6 stress test with 200 concurrent users
+**Thiết lập Test**: k6 stress test với 200 người dùng đồng thời
 
 ```
-Scenario: Driver location updates + nearby driver queries
-- 1000 drivers updating location every 5 seconds
-- 200 passengers searching for nearby drivers
-- Duration: 5 minutes
+Kịch bản: Cập nhật vị trí tài xế + truy vấn tài xế gần đó
+- 1000 tài xế cập nhật vị trí mỗi 5 giây
+- 200 hành khách tìm kiếm tài xế gần đó
+- Thời lượng: 5 phút
 
-Results:
-✅ GEORADIUS avg latency: 4.8ms
+Kết quả:
+✅ GEORADIUS độ trễ trung bình: 4.8ms
 ✅ P95 latency: 8.2ms
 ✅ P99 latency: 12.5ms
-✅ Throughput: 15,000 queries/sec
-✅ Error rate: 0%
+✅ Throughput: 15,000 truy vấn/giây
+✅ Tỷ lệ lỗi: 0%
 ✅ Redis memory usage: 85MB
 ```
 
-### Cost Comparison (Monthly, Production Scale)
+### So sánh Chi phí (Hàng tháng, Quy mô Production)
 
-| Solution              | Instance Type                      | Cost     | Notes                   |
+| Giải pháp             | Loại Instance                      | Chi phí  | Ghi chú                 |
 | --------------------- | ---------------------------------- | -------- | ----------------------- |
 | **Redis ElastiCache** | cache.r6g.large (2 vCPU, 13.07 GB) | **$110** | Multi-AZ, auto-failover |
 | **DynamoDB**          | Provisioned 1000 WCU, 1000 RCU     | **$580** | Auto-scaling enabled    |
-| **PostgreSQL RDS**    | db.r6g.large + PostGIS             | **$220** | Includes backup storage |
+| **PostgreSQL RDS**    | db.r6g.large + PostGIS             | **$220** | Bao gồm backup storage  |
 
-**Winner**: Redis is **5.3x cheaper** than DynamoDB for this use case.
-
----
-
-## Consequences
-
-### Positive
-
-- ✅ **Fast development**: Implemented in 2 days vs estimated 1-2 weeks for DynamoDB
-- ✅ **Excellent performance**: Consistently <10ms, exceeds requirements
-- ✅ **Simple codebase**: 50 lines of code vs 200+ for geohash logic
-- ✅ **Cost savings**: $470/month saved vs DynamoDB option
-- ✅ **Easy testing**: Docker Compose setup, no AWS dependencies locally
-
-### Negative
-
-- ⚠️ **New dependency**: Team needs to learn Redis operations
-- ⚠️ **Monitoring required**: Need to watch memory usage, eviction rates
-- ⚠️ **Failover testing**: Must verify ElastiCache Multi-AZ works as expected
-
-### Risks & Mitigation
-
-| Risk                        | Likelihood | Impact | Mitigation                            |
-| --------------------------- | ---------- | ------ | ------------------------------------- |
-| **Redis crash loses data**  | Low        | Medium | RDB+AOF persistence, MongoDB fallback |
-| **Memory exhaustion**       | Medium     | High   | LRU eviction, monitoring alerts       |
-| **Single point of failure** | Low        | High   | Redis Cluster, Multi-AZ ElastiCache   |
-| **Vendor lock-in**          | Low        | Medium | Redis is open-source, portable        |
+**Người chiến thắng**: Redis **rẻ hơn 5.3 lần** so với DynamoDB cho use case này.
 
 ---
 
-## Alternatives Rejected
+## Hậu quả
 
-### Why not DynamoDB?
+### Tích cực
 
-While DynamoDB offers scalability and managed operations, it fails on:
+- ✅ **Phát triển nhanh**: Triển khai trong 2 ngày so với ước tính 1-2 tuần cho DynamoDB
+- ✅ **Hiệu suất xuất sắc**: Ổn định <10ms, vượt yêu cầu
+- ✅ **Codebase đơn giản**: 50 dòng code so với 200+ cho logic geohash
+- ✅ **Tiết kiệm chi phí**: Tiết kiệm $470/tháng so với phương án DynamoDB
+- ✅ **Kiểm thử dễ dàng**: Thiết lập Docker Compose, không phụ thuộc AWS ở local
 
-1. **Performance**: 25-60ms latency vs <10ms requirement
-2. **Cost**: 5x more expensive
-3. **Complexity**: Custom geohash implementation required
+### Tiêu cực
 
-**Use DynamoDB when**:
+- ⚠️ **Dependency mới**: Team cần học các thao tác Redis
+- ⚠️ **Cần giám sát**: Cần theo dõi memory usage, eviction rates
+- ⚠️ **Kiểm thử failover**: Phải xác minh ElastiCache Multi-AZ hoạt động như mong đợi
 
-- Need multi-region replication
-- Data durability is critical
-- Budget allows for premium managed service
+### Rủi ro & Giảm thiểu
 
-### Why not PostgreSQL+PostGIS?
-
-PostGIS is overkill for simple radius queries. Use when:
-
-- Need complex spatial operations (polygon intersection, etc.)
-- Require ACID transactions with spatial data
-- Already using PostgreSQL for other data
-
----
-
-## Follow-up Actions
-
-- [x] Implement Redis geospatial service (2025-10-16)
-- [x] Add monitoring for Redis memory usage (2025-10-18)
-- [x] Load test with 10,000 drivers (2025-10-20)
-- [ ] Setup ElastiCache on AWS staging (2025-11-01)
-- [ ] Document failover procedures (2025-11-05)
-- [ ] Train team on Redis operations (2025-11-10)
+| Rủi ro                      | Khả năng | Tác động | Giảm thiểu                            |
+| --------------------------- | -------- | -------- | ------------------------------------- |
+| **Redis crash mất dữ liệu** | Thấp     | Trung    | RDB+AOF persistence, MongoDB fallback |
+| **Cạn kiệt bộ nhớ**         | Trung    | Cao      | LRU eviction, monitoring alerts       |
+| **Single point of failure** | Thấp     | Cao      | Redis Cluster, Multi-AZ ElastiCache   |
+| **Vendor lock-in**          | Thấp     | Trung    | Redis là mã nguồn mở, dễ di chuyển    |
 
 ---
 
-## References
+## Các Phương án Bị từ chối
+
+### Tại sao không dùng DynamoDB?
+
+Mặc dù DynamoDB cung cấp khả năng mở rộng và managed operations, nó thất bại về:
+
+1. **Hiệu suất**: Độ trễ 25-60ms so với yêu cầu <10ms
+2. **Chi phí**: Đắt hơn 5 lần
+3. **Độ phức tạp**: Cần triển khai geohash tùy chỉnh
+
+**Sử dụng DynamoDB khi**:
+
+- Cần multi-region replication
+- Độ bền dữ liệu là quan trọng
+- Ngân sách cho phép dịch vụ managed cao cấp
+
+### Tại sao không dùng PostgreSQL+PostGIS?
+
+PostGIS là quá mức cần thiết cho truy vấn bán kính đơn giản. Sử dụng khi:
+
+- Cần các thao tác không gian phức tạp (polygon intersection, v.v.)
+- Yêu cầu ACID transactions với dữ liệu không gian
+- Đã sử dụng PostgreSQL cho dữ liệu khác
+
+---
+
+## Các Hành động Tiếp theo
+
+- [x] Triển khai Redis geospatial service (2025-10-16)
+- [x] Thêm giám sát cho Redis memory usage (2025-10-18)
+- [x] Load test với 10,000 tài xế (2025-10-20)
+- [ ] Cài đặt ElastiCache trên AWS staging (2025-11-01)
+- [ ] Tài liệu hóa quy trình failover (2025-11-05)
+- [ ] Đào tạo team về thao tác Redis (2025-11-10)
+
+---
+
+## Tài liệu Tham khảo
 
 - [Redis Geospatial Commands Documentation](https://redis.io/commands/?group=geo)
 - [Uber's Geospatial Index (H3)](https://eng.uber.com/h3/)
 - [AWS ElastiCache Pricing](https://aws.amazon.com/elasticache/pricing/)
 - [DynamoDB Geospatial Indexing Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-gsi-geospatial.html)
-- Load Test Results: `test/load-tests/STRESS_TEST_REPORT.md`
+- Kết quả Load Test: `test/load-tests/STRESS_TEST_REPORT.md`
 
 ---
 
 **Reviewed by**: Architecture Team  
 **Approved by**: Tech Lead  
-**Next Review**: 2025-12-01 (after 1 month in production)
+**Next Review**: 2025-12-01 (sau 1 tháng trong production)
