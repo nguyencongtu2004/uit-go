@@ -129,8 +129,6 @@ services:
     volumes:
       - ./services/user-service/src:/app/src
       - ./common:/app/common
-      - /app/node_modules
-      - /app/common/node_modules
       - user_service_logs:/app/logs
     env_file:
       - ./env/user-service.env
@@ -153,8 +151,6 @@ services:
     volumes:
       - ./services/driver-service/src:/app/src
       - ./common:/app/common
-      - /app/node_modules
-      - /app/common/node_modules
       - driver_service_logs:/app/logs
     env_file:
       - ./env/driver-service.env
@@ -177,8 +173,6 @@ services:
     volumes:
       - ./services/trip-service/src:/app/src
       - ./common:/app/common
-      - /app/node_modules
-      - /app/common/node_modules
       - trip_service_logs:/app/logs
     env_file:
       - ./env/trip-service.env
