@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  labels:
+    app: traefik
+spec:
+  type: LoadBalancer  # Cho dev local, có thể dùng NodePort hoặc LoadBalancer
+  selector:
+    app: traefik
+  ports:
+    - name: web
+      port: 80
+      targetPort: 80
+      protocol: TCP
+      # nodePort: 30080  # Uncomment nếu dùng type: NodePort
+    - name: websecure
+      port: 443
+      targetPort: 443
+      protocol: TCP
+      # nodePort: 30443  # Uncomment nếu dùng type: NodePort
+    - name: admin
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+      # nodePort: 30800  # Uncomment nếu dùng type: NodePort

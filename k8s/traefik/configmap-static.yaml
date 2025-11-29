@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-config
+  labels:
+    app: traefik
+data:
+  traefik.yml: |
+    # Traefik Configuration for UIT-Go Microservices (Kubernetes)
+    # Main configuration file for Traefik v3 reverse proxy
+    
+    # API and Dashboard
+    api:
+      dashboard: true
+      insecure: true # Enable for development - disable in production
+      debug: true
+    
+    # Ping endpoint for health checks
+    ping:
+      entryPoint: traefik
+    
+    # Entry Points Configuration
+    entryPoints:
+      web:
+        address: ":80"
+        # HTTP redirect to HTTPS in production
+        # http:
+        #   redirections:
+        #     entrypoint:
+        #       to: websecure
+        #       scheme: https
+    
+      websecure:
+        address: ":443"
+        # HTTP/2 and HTTP/3 support
+        http2:
+          maxConcurrentStreams: 250
+        http3: {}
+    
+      traefik:
+        address: ":8080"
+    
+    # Providers Configuration
+    providers:
+      # Kubernetes CRD provider for IngressRoute
+      kubernetesCRD:
+        allowCrossNamespace: true
+        allowExternalNameServices: true
+    
+      # Kubernetes Ingress provider
+      kubernetesIngress:
+        allowExternalNameServices: true
+    
+      # File provider for static configuration and middleware
+      file:
+        directory: /etc/traefik/dynamic
+        watch: true
+    
+    # Certificate Resolvers (for production SSL)
+    certificatesResolvers:
+      letsencrypt:
+        acme:
+          email: admin@uit-go.local
+          storage: /etc/traefik/acme.json
+          httpChallenge:
+            entryPoint: web
+          # Alternative: DNS challenge for wildcard certificates
+          # dnsChallenge:
+          #   provider: cloudflare
+          #   delayBeforeCheck: 0
+    
+    # Logging
+    log:
+      level: INFO
+    
+    # Access Logs
+    accessLog:
+      bufferingSize: 100

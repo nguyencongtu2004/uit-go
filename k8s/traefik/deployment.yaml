@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik
+  labels:
+    app: traefik
+spec:
+  replicas: 1  # Cho dev, 1 replica là đủ
+  selector:
+    matchLabels:
+      app: traefik
+  template:
+    metadata:
+      labels:
+        app: traefik
+    spec:
+      serviceAccountName: traefik
+      containers:
+        - name: traefik
+          image: traefik:v3.0
+          ports:
+            - name: web
+              containerPort: 80
+              protocol: TCP
+            - name: websecure
+              containerPort: 443
+              protocol: TCP
+            - name: admin
+              containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            - name: traefik-config
+              mountPath: /etc/traefik
+              readOnly: true
+            - name: traefik-dynamic-config
+              mountPath: /etc/traefik/dynamic
+              readOnly: true
+          resources:
+            # Cho môi trường dev, resource nhẹ là đủ
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: traefik-config
+          configMap:
+            name: traefik-config
+        - name: traefik-dynamic-config
+          configMap:
+            name: traefik-dynamic-config

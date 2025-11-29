@@ -201,7 +201,13 @@ const driverStatusSchema = Joi.object({
         .messages({
             'any.only': 'Driver status must be one of: OFFLINE, AVAILABLE, BUSY, IN_TRIP',
             'any.required': 'Driver status is required'
-        })
+        }),
+
+    location: Joi.object({
+        latitude: Joi.number().min(-90).max(90).required(),
+        longitude: Joi.number().min(-180).max(180).required(),
+        address: Joi.string().optional()
+    }).optional()
 });
 
 /**

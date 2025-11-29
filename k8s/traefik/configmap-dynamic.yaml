@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traefik-dynamic-config
+  labels:
+    app: traefik
+data:
+  middlewares.yml: |
+    # Dynamic Configuration for Traefik
+    # This file contains dynamic routing rules and middleware
+    
+    # HTTP Configuration
+    http:
+      # Middlewares
+      middlewares:
+        # Security Headers with Helmet functionality
+        security-headers:
+          headers:
+            frameDeny: true
+            sslRedirect: false # Set to true in production
+            browserXssFilter: true
+            contentTypeNosniff: true
+            forceSTSHeader: false # Set to true in production with HTTPS
+            stsIncludeSubdomains: true
+            stsPreload: true
+            stsSeconds: 31536000
+            customRequestHeaders:
+              X-Forwarded-Proto: "https"
+            customResponseHeaders:
+              X-Robots-Tag: "noindex,nofollow,nosnippet,noarchive"
+              X-Content-Type-Options: "nosniff"
+              X-Frame-Options: "DENY"
+              X-XSS-Protection: "1; mode=block"
+    
+        # CORS middleware for API endpoints
+        api-cors:
+          headers:
+            accessControlAllowMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            accessControlAllowOriginList:
+              - "*"
+            accessControlAllowHeaders:
+              - "Content-Type"
+              - "Authorization"
+              - "X-Requested-With"
+              - "Accept"
+              - "Origin"
+              - "Cache-Control"
+              - "X-File-Name"
+            accessControlExposeHeaders:
+              - "Content-Length"
+              - "Content-Range"
+              - "X-Total-Count"
+            accessControlAllowCredentials: true
+            accessControlMaxAge: 86400
+    
+        # Rate limiting middleware
+        rate-limit:
+          rateLimit:
+            period: "1m"
+            average: 100
+            burst: 50
+    
+        # Compression middleware
+        compression:
+          compress: {}
+    
+        # Request size limit
+        request-limit:
+          buffering:
+            maxRequestBodyBytes: 10485760 # 10MB
+    
+        # Chain all middlewares
+        api-middleware:
+          chain:
+            middlewares:
+              - security-headers
+              - api-cors
+              # - rate-limit
+              - compression
+              - request-limit
+  
+  dashboard.yml: |
+    http:
+      routers:
+        traefik-dashboard:
+          rule: "Host(`traefik.localhost`) || PathPrefix(`/dashboard`)"
+          entryPoints:
+            - "traefik"
+          service: api@internal

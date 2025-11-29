@@ -268,9 +268,10 @@ const updateLocation = async (req, res) => {
 const updateDriverStatus = async (req, res) => {
     try {
         const { id } = req.params;
-        const { driverStatus } = req.body;
+        const { driverStatus, location } = req.body; // location có thể { latitude, longitude, address? }
 
-        // Check if user is a driver
+        console.log('req.body: ', req.body);
+        // Check role
         if (req.user.role !== 'DRIVER') {
             return res.status(403).json({
                 success: false,
@@ -279,10 +280,8 @@ const updateDriverStatus = async (req, res) => {
             });
         }
 
-        // Get current user data with location
-        const currentUser = await User.findOne(
-            { _id: id, role: 'DRIVER', isActive: true }
-        ).select('location driverInfo');
+        const currentUser = await User.findOne({ _id: id, role: 'DRIVER', isActive: true })
+            .select('location driverInfo');
 
         if (!currentUser) {
             return res.status(404).json({
@@ -292,36 +291,66 @@ const updateDriverStatus = async (req, res) => {
             });
         }
 
+        // Validate incoming location (numbers, range)
+        const hasValidBodyLocation = location &&
+            !Number.isNaN(Number(location.latitude)) &&
+            !Number.isNaN(Number(location.longitude)) &&
+            Math.abs(Number(location.latitude)) <= 90 &&
+            Math.abs(Number(location.longitude)) <= 180;
+
+        // Build $set payload — **SET GeoJSON shape** khi lưu
+        const setObj = {
+            'driverInfo.driverStatus': driverStatus,
+            'driverInfo.lastLocationUpdate': new Date()
+        };
+
+        if (hasValidBodyLocation) {
+            const lat = Number(location.latitude);
+            const lon = Number(location.longitude);
+            setObj.location = {
+                type: 'Point',
+                coordinates: [lon, lat],
+                address: location.address || undefined
+            };
+        }
+
+        // Run validators (important) and return new doc
         const updatedUser = await User.findOneAndUpdate(
             { _id: id, role: 'DRIVER', isActive: true },
-            {
-                $set: {
-                    'driverInfo.driverStatus': driverStatus,
-                    'driverInfo.lastLocationUpdate': new Date()
-                }
-            },
-            { new: true, runValidators: true }
+            { $set: setObj },
+            { new: true, runValidators: true, context: 'query' } // context:'query' giúp validators chạy đúng khi dùng update
         ).select('driverInfo location');
 
-        // Update isOnline based on driver status
-        const isOnline = driverStatus === 'AVAILABLE' || driverStatus === 'BUSY' || driverStatus === 'IN_TRIP';
+        console.log('updatedUser: ', updatedUser);
+
+        // Update isOnline
+        const isOnline = ['AVAILABLE', 'BUSY', 'IN_TRIP'].includes(driverStatus);
         await User.findByIdAndUpdate(id, { isOnline });
 
-        // Sync driver location with Trip Service for matching
+        // Decide location to sync: ưu tiên DB GeoJSON, fallback body location
+        let locToSync = null;
+        if (updatedUser && updatedUser.location && Array.isArray(updatedUser.location.coordinates) && updatedUser.location.coordinates.length === 2) {
+            locToSync = {
+                latitude: updatedUser.location.coordinates[1],
+                longitude: updatedUser.location.coordinates[0]
+            };
+        } else if (hasValidBodyLocation) {
+            // fallback: use request body location
+            locToSync = { latitude: Number(location.latitude), longitude: Number(location.longitude) };
+        }
+
+        // Sync to Trip Service if have location
         try {
             const tripServiceUrl = process.env.TRIP_SERVICE_URL || 'http://trip-service:3000';
-
-            if (updatedUser.location && updatedUser.location.latitude && updatedUser.location.longitude) {
+            if (locToSync) {
                 await axios.post(`${tripServiceUrl}/drivers/location/sync`, {
                     driverId: id,
-                    latitude: updatedUser.location.latitude,
-                    longitude: updatedUser.location.longitude,
+                    latitude: locToSync.latitude,
+                    longitude: locToSync.longitude,
                     status: driverStatus
                 }, {
                     timeout: 5000,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Content-Type': 'application/json' }
                 });
 
                 console.log(`Driver location synced to Trip Service: ${id} -> ${driverStatus}`);
@@ -329,7 +358,6 @@ const updateDriverStatus = async (req, res) => {
                 console.warn(`Driver ${id} status updated but no location available for sync`);
             }
         } catch (syncError) {
-            // Log sync error but don't fail the status update
             console.error(`Failed to sync driver location with Trip Service: ${syncError.message}`);
         }
 
@@ -342,7 +370,7 @@ const updateDriverStatus = async (req, res) => {
                 driverStatus: updatedUser.driverInfo.driverStatus,
                 isOnline,
                 lastLocationUpdate: updatedUser.driverInfo.lastLocationUpdate,
-                locationSynced: !!(updatedUser.location && updatedUser.location.latitude && updatedUser.location.longitude)
+                locationSynced: !!locToSync
             }
         });
 
