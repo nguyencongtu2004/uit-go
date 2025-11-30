@@ -1,0 +1,44 @@
+# AWS Configuration
+aws_region  = "us-east-1"
+project_name = "uit-go"
+environment  = "production"
+
+# VPC Configuration
+vpc_cidr = "10.0.0.0/16"
+availability_zones = ["us-east-1a", "us-east-1b", "us-east-1c"]
+
+# EKS Configuration
+eks_cluster_version = "1.28"
+eks_node_groups = {
+  general = {
+    desired_size   = 3
+    min_size       = 3
+    max_size       = 10
+    instance_types = ["t3.medium"]
+    capacity_type  = "ON_DEMAND"
+  }
+}
+
+# ElastiCache Redis Configuration
+redis_node_type = "cache.t3.medium"
+redis_num_nodes = 3
+
+# Amazon MSK Configuration
+kafka_version       = "3.5.1"
+kafka_instance_type = "kafka.t3.small"
+kafka_broker_count  = 3
+
+# DocumentDB Configuration
+docdb_master_username = "uitgo_admin"
+docdb_master_password = "CHANGE_ME_SECURE_PASSWORD"
+docdb_instance_class  = "db.t3.medium"
+docdb_instance_count  = 3
+
+# ACM Certificate ARN (leave empty if not using HTTPS)
+acm_certificate_arn = ""
+
+# Additional Tags
+additional_tags = {
+  Team = "DevOps"
+  CostCenter = "Engineering"
+}
